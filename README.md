@@ -206,6 +206,10 @@ devtools::test()
 
 When adding new functionality, please add corresponding unit tests in the `tests/testthat/` directory.
 
+## Author
+
+This package was developed by Dr. Mitja Kurki.
+
 ## License
 
 This package is licensed under the MIT License.
