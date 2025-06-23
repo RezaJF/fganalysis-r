@@ -80,3 +80,37 @@ test_that("create_drug_response returns the correct structure", {
   expect_equal(result$response$after, c(25, 40))
   expect_equal(result$response$response, c(9, 31))
 })
+
+test_that("create_drug_response removes outliers correctly", {
+  kanta <- data.frame(
+    FINNGENID = c("FG1", "FG1", "FG1", "FG1", "FG2", "FG2", "FG2", "FG2", "FG3", "FG3", "FG4", "FG4"),
+    OMOP_CONCEPT_ID = c("lab1", "lab1", "lab1", "lab1", "lab1", "lab1", "lab1", "lab1", "lab1", "lab1", "lab1", "lab1"),
+    EVENT_AGE = c(20.6, 20.7, 20.8, 21.5, 19.5, 19.6, 19.7, 20.5, 25, 25.5, 30, 30.5),
+    MEASUREMENT_VALUE_HARMONIZED = c(15, 16, 17, 25, 8, 9, 10, 40, 50, 38, 1000, 1001) # Add a clear outlier
+  )
+  
+  phenos <- data.frame(
+    FINNGENID = c("FG1", "FG2", "FG3", "FG4"),
+    SOURCE = c("PURCH", "PURCH", "PURCH", "PURCH"),
+    CODE1 = c("A01", "A02", "A02", "A01"),
+    CODE2 = c("", "", "", ""),
+    CODE3 = c("", "", "", ""),
+    CODE4 = c("1", "1", "1", "1"),
+    EVENT_AGE = c(21.0, 20.0, 35.0, 31.0)
+  )
+                        
+  lablist <- c("lab1")
+  druglist <- c("A01", "A02")
+  
+  # Test with outlier removal
+  result <- create_drug_response(kanta, phenos, lablist, druglist, c(-1, 0), c(0.1, 1), remove_outliers_sd = 1)
+  
+  # FG4 has the outlier and should be removed from the response
+  expect_s3_class(result, "drug.reponse")
+  expect_equal(nrow(result$responses), 2)
+  expect_false("FG4" %in% result$responses$FINNGENID)
+  
+  # Test that it throws an error with invalid input
+  expect_error(create_drug_response(kanta, phenos, lablist, druglist, c(-1, 0), c(0.1, 1), remove_outliers_sd = 7))
+  expect_error(create_drug_response(kanta, phenos, lablist, druglist, c(-1, 0), c(0.1, 1), remove_outliers_sd = "a"))
+})

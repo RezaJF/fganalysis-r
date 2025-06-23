@@ -10,7 +10,8 @@ create_drug_response(
   druglist,
   before_period,
   after_period,
-  finngen_ids = NULL
+  finngen_ids = NULL,
+  remove_outliers_sd = NULL
 )
 }
 \arguments{
@@ -25,6 +26,8 @@ create_drug_response(
 \item{after_period}{vector with two elements, start and end of the after period}
 
 \item{finngen_ids}{vector of FINNGENIDs to filter the data}
+
+\item{remove_outliers_sd}{integer, if defined, remove outliers from the lab measurements. The value is the number of standard deviations from the mean to define an outlier (i.e. 1, 2, 3, 4, 5, 6)}
 }
 \value{
 drug.response object

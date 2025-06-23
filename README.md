@@ -1,124 +1,210 @@
-# Package for common analyses in FinnGen.
+# fganalysis R Package
 
 ## Overview
 
-The `fganalysis` is an R package designed for common analyses performed in FinnGen.  First functionality provides functions for data processing, summarization, and visualization of lab measurements and drug purchases.
-
+The `fganalysis` is an R package designed for common analyses performed in FinnGen. It provides functions for data processing, summarization, and visualization of lab measurements and drug purchases to study drug response.
 
 ## Installation
 
-You can install the package from the local directory using the following command after installing `devtools` package:
-
-Need to make precompiled packages of everything for sandbox.
+To use this package, you can install it from a local source. First, ensure you have the `devtools` package installed in R.
 
 ```R
-Some packages might get installed from source and to speedup that, can add multithreaded compilation.... add environment variable to enable 4 threads. 
-Sys.setenv(MAKEFLAGS = "-j 4")
+# If devtools is not installed, run this line:
+# install.packages("devtools")
 
-## if installing from source, install devtools and
-devtools::install("path/to/fganalysis")
+# Set MAKEFLAGS for faster compilation if installing from source
+Sys.setenv(MAKEFLAGS = "-j4")
 
-## in sandbox, you can just
-install.packages("fganalysis")
-
+# Install the package from its local directory
+devtools::install("path/to/fganalysis-r")
 ```
 
-## Usage
-
-After installing the package, you can load it using:
+Once installed, load the package into your R session:
 
 ```R
-library("fganalysis")
-```
-
-### Functions
-
-The package includes several key functions:
-
-- `create_drug_response()`: Generates a drug response dataset based on lab measurements and drug purchases.
-- `summarize_drug_response()`: Creates a summary PDF and text tables of drug response data.
-- `get_lab_measurements` and `get_drug_purchases` to query for lab values and purchases.
-
-## Examples
-
-Here is a simple example of how to use the package:
-
-```R
-# Load the package
 library(fganalysis)
+```
 
-## get connection to data sources. in sanbox you can find data source configuration in /finngen/shared_nfs/finngen/code/drugResponsePackage/config/db_config_sb.json
-conn <- connect_fgdata("config/db_config.json")
-### SANDBOX
+## Data Access
+
+The package accesses data through a centralized connection object. The connection is configured via a JSON file, which specifies the paths to different datasets.
+
+### Configuration
+
+The `connect_fgdata()` function reads a JSON configuration file to set up data sources. A sample configuration file `config/db_config.json` looks like this:
+
+```json
+{
+    "pheno": {
+        "path": "/path/to/finngen_R13_service_sector_detailed_longitudinal_1.0.parquet",
+        "type": "parquet-hive"
+    },
+    "labs": {
+        "path": "/path/to/finngen_R13_kanta_lab_1.0.parquet",
+        "type": "parquet"
+    },
+    "minimum": {
+        "path": "/path/to/finngen_R13_minimum_extended_1.0.parquet",
+        "type": "parquet"
+    },
+    "cov_pheno": {
+        "path": "/path/to/R13_COV_PHENO_V0.parquet",
+        "type": "parquet"
+    }
+}
+```
+
+The package uses `duckdb` to query data stored in the `parquet` format. The connection object returned by `connect_fgdata` contains lazy-loaded `dplyr` tables (`tbl` objects), meaning the data is only loaded into memory when you explicitly perform a query.
+
+The main data tables are:
+- **`pheno`**: Longitudinal data from service sector records, including drug purchases.
+- **`labs`**: Laboratory measurements from KANTA.
+- **`minimum`**: Minimum phenotype data for individuals.
+- **`cov_pheno`**: Covariate phenotype data.
+
+### Connecting to Data
+
+To establish a connection, pass the path to your configuration file to `connect_fgdata`:
+
+```R
+# The path can be relative or absolute
+# In the FinnGen Sandbox, a pre-configured file is available
 conn <- connect_fgdata("/finngen/shared_nfs/finngen/code/drugResponsePackage/config/db_config_sb.json")
 
+# Or using a local config file
+conn <- connect_fgdata("config/db_config.json")
 
+## Returned object has attributes that are lazy loaded data frames of different phenotype data.
+## You can start writing dplyr queries and e.g. joining to other tables. Nothing will happen before you actually request the data to be localized.
+## Behind the scenes, a query engine optimizes the query and returns only the data matching your query.
 
-##returned object has attributes that are lazy loaded data frames of different phenotype data.
-## you can start writing dplyr queries and e.g. joining to other tables. Nothing will happen before you actually request the data to be localized.
-## behind the scenes, a query engine optimizes the query and returns only the data matching your query....
+## Query for individuals with ICD-10 code K51 (IBD)
+ibd <- conn$pheno %>%
+  filter((SOURCE == "INPAT" | SOURCE == "OUTPAT") & CODE1 == "K51" & ICDVER == "10") %>%
+  group_by(FINNGENID) %>%
+  summarize(n_diagnoses = n())
 
-## query for individuals with ICD-10 code K51 (IBD)
-ibd <- conn$pheno %>% filter( (SOURCE=="INPAT"|SOURCE=="OUTPAT") & CODE1=="K51" & ICDVER=="10") %>% group_by(FINNGENID) %>% summarize(n_diagnoses=n())
-## look at the number of rows..
-
->nrow(ibd)
-NA
-### you get NA because nothing has been queried before you ask for the data. use function collect to execute the query and return results
+## Look at the number of rows
+nrow(ibd)
+# NA - you get NA because nothing has been queried before you ask for the data.
+# Use function collect to execute the query and return results
 ibd <- ibd %>% collect()
 nrow(ibd)
-258
+# 258
 
-## get all labs with omopid 3007461
+## Get all labs with omopid 3007461
 labs <- get_lab_measurements(conn$labs, c("3007461"))
 
-## get all drug purchases with ATC codes starting with L01B
+## Get all drug purchases with ATC codes starting with L01B
 dr <- get_drug_purchases(conn, c("L01B"))
 
-
 # Create drug response data of lab changes after initiating a drug.
-## first define time intervals from drug purchase to summarise lab values
-## here defining pre-measurements drug measurements to be 1 year before drug and 
-## after period to be 1month to 1 year.
+## First define time intervals from drug purchase to summarise lab values
+## Here defining pre-measurements drug measurements to be 1 year before drug and
+## after period to be 1 month to 1 year.
 before_period <- c(-1, 0)
 after_period <- c(1/12, 1)
 
-## create a dataframe containing LDL (omopid 3001308) response to first statin purchase (ATC codes starting with A10) for each finngen ID  
-resp <- create_drug_response(conn,conn$pheno,c("3001308"), 
-                             druglist=c("A10"),before_period,after_period)
-## create plots and tables of the respons
-summarize_drug_response(resp, out_file_prefix="3001308_A10_resp")
+## Create a dataframe containing LDL (omopid 3001308) response to first statin purchase (ATC codes starting with A10) for each finngen ID
+resp <- create_drug_response(conn, c("3001308"),
+                             druglist = c("A10"),
+                             before_period,
+                             after_period,
+                             remove_outliers_sd = 3)  # Optional: remove outliers
 
-
-
-
+## Create plots and tables of the response
+summarize_drug_response(resp, out_file_prefix = "3001308_A10_resp")
 ```
 
+The returned `conn` object is a `fg_data_connection` object, and you can access the data tables as its attributes (e.g., `conn$pheno`, `conn$labs`).
 
-## Development &  Data storage
+## Available Functions
+
+This package provides a suite of functions for drug response analysis.
+
+### Data Connection
+- **`connect_fgdata(path_to_conf)`**: Connects to the databases specified in the JSON configuration file and returns a `fg_data_connection` object.
+
+### Data Retrieval
+- **`get_lab_measurements(all_labs, lablist, ...)`**: Extracts lab measurements for specified OMOP concept IDs.
+- **`get_drug_purchases(all_phenos, druglist, ...)`**: Extracts drug purchases for specified ATC codes. The matching is done on the beginning of the ATC code.
+- **`get_first_purchase(all_phenos, druglist, ...)`**: A wrapper around `get_drug_purchases` to get only the first purchase event for each individual.
+
+### Analysis
+- **`create_drug_response(conn, lablist, druglist, before_period, after_period, finngen_ids = NULL, remove_outliers_sd = NULL)`**: The main analysis function. It calculates the drug response based on lab value changes before and after the first drug purchase. The `remove_outliers_sd` parameter can be used to remove outliers (specify number of SDs from mean, e.g., 1-6).
+- **`generate_response_summary(lab_measurements, before_period, after_period, ...)`**: A helper function to calculate the summary statistics for the response (e.g., median value before and after treatment). Called by `create_drug_response`.
+
+### Summarization and Output
+- **`summarize_drug_response(drug_response, out_file_prefix)`**: Generates a PDF report with plots and tables summarizing the drug response analysis results.
+- **`drug.response(...)`**: This is not a function to be called directly by the user, but rather the S3 object class that holds the results from `create_drug_response`. It's a list containing the response data, all lab measurements, all drug purchases, and the time periods used for the analysis.
+
+## Example Workflow
+
+Here is a complete example of how to use the package to analyze the effect of statins (ATC code `A10`) on LDL cholesterol levels (OMOP ID `3001308`).
+
+```R
+# 1. Load the package
+library(fganalysis)
+
+# 2. Connect to the data sources
+#    (replace with the correct path to your config file)
+conn <- connect_fgdata("config/db_config.json")
+
+# The conn object contains lazy-loaded tables.
+# You can use dplyr verbs on them. The query is executed only when you `collect()`.
+# For example, count IBD diagnoses:
+ibd_counts <- conn$pheno %>%
+  filter((SOURCE == "INPAT" | SOURCE == "OUTPAT") & CODE1 == "K51" & ICDVER == "10") %>%
+  group_by(FINNGENID) %>%
+  summarise(n_diagnoses = n()) %>%
+  collect()
+
+print(head(ibd_counts))
 
 
-Install `devtools` package. When in root folder of package you can load everything with `devtools::load_all()`.  Read more about package dev with devtools here https://cran.r-project.org/web/packages/devtools/readme/README.html and https://r-pkgs.org/
+# 3. Define parameters for drug response analysis
+#    - Lab ID for LDL
+#    - ATC code for statins
+#    - Time windows for "before" and "after" measurements
+lab_id <- c("3001308")
+drug_codes <- c("A10")
+before_window <- c(-1, 0)      # 1 year before to drug purchase
+after_window <- c(1/12, 1)   # 1 month to 1 year after drug purchase
 
-Database connection is defined in config/db_config.json. Currently data is stored in parquet files and queried via duckdb. This way there are no external dependencies on databases.  
-If new ways to access data are introduced, add handling of such datatypes in R/connections.R `connect_fgdata`. Returned objects should be lazy loaded dplyr::tbl objects so further processing can be done via dbplyr (https://dbplyr.tidyverse.org/)
+# 4. Run the drug response analysis
+#    This function will:
+#    - Get the relevant lab measurements and drug purchases.
+#    - Find the first drug purchase for each individual.
+#    - Calculate the difference in median lab values between the 'after' and 'before' periods.
+response_data <- create_drug_response(
+  conn = conn,
+  lablist = lab_id,
+  druglist = drug_codes,
+  before_period = before_window,
+  after_period = after_window
+  # Optionally remove outliers: remove_outliers_sd = 3
+)
 
+# 5. Summarize the results
+#    This will create a PDF file with plots and text files with summary tables.
+summarize_drug_response(response_data, out_file_prefix = "statin_ldl_response_summary")
+```
 
-### Testing
+This will produce files like `statin_ldl_response_summary.pdf`, `statin_ldl_response_summary_responses_by_drug.txt`, etc., in your working directory.
 
+## Development
 
-The package includes unit tests to ensure the functionality of its core functions. You can run the tests using:
+Contributions and improvements are welcome.
+
+### Running Tests
+
+The package uses `testthat` for unit tests. To run the tests, use:
 
 ```R
 devtools::test()
 ```
 
-
-When adding new functionality add unit tests. See tests/testthat/test-drug_response_functions.R for examples.
-
-## Author
-
-[Mitja Kurki]
+When adding new functionality, please add corresponding unit tests in the `tests/testthat/` directory.
 
 ## License
 
