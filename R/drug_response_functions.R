@@ -5,6 +5,7 @@
 #' @importFrom stats median lm quantile sd
 #' @import utils
 #' @import grDevices
+#' @import UpSetR
 #NULL
 
 #' @title data object returned from drug response analyse (create_drug_response)
@@ -291,4 +292,41 @@ get_first_purchase <- function(all_phenos, druglist, finngen_ids=NULL, return_co
     filter(.data$EVENT_AGE == min(.data$EVENT_AGE)) %>% distinct(.data$EVENT_AGE, .keep_all = TRUE) %>%
     ungroup() %>%
     select(all_of(return_cols))
+}
+
+#' @title Generate an UpSet plot of drug purchase combinations
+#' @description Creates and saves an UpSet plot to visualize the overlap of purchased drug ATC codes.
+#' @param drug_response A `drug.response` object created by `create_drug_response`.
+#' @param out_file_prefix A string to use as the prefix for the output PDF file.
+#' @return NULL
+#' @export
+summarize_drug_purchases_upset <- function(drug_response, out_file_prefix) {
+  if (!inherits(drug_response, "drug.reponse")) {
+    stop("Input must be a drug.reponse object.")
+  }
+
+  upset_data <- drug_response$all_drug_purchases %>%
+    select("FINNGENID", "ATC") %>%
+    distinct() %>%
+    mutate(value = 1) %>%
+    tidyr::pivot_wider(names_from = "ATC", values_from = "value", values_fill = 0) %>%
+    select(-"FINNGENID") %>%
+    as.data.frame()
+
+  pdf(paste0(out_file_prefix, "_upset_plot.pdf"), width = 10, height = 7)
+  
+  UpSetR::upset(upset_data, 
+        nsets = ncol(upset_data),
+        nintersects = 20,
+        mb.ratio = c(0.6, 0.4),
+        order.by = "freq", 
+        decreasing = TRUE, 
+        text.scale = 1.2,
+        mainbar.y.label = "Number of FINNGEN IDs",
+        sets.x.label = "Patients per Drug Subtype", 
+        set_size.show = TRUE)
+        
+  dev.off()
+  
+  print(paste0("UpSet plot saved to ", out_file_prefix, "_upset_plot.pdf"))
 }

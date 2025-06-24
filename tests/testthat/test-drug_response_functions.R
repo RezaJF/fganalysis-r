@@ -114,3 +114,30 @@ test_that("create_drug_response removes outliers correctly", {
   expect_error(create_drug_response(kanta, phenos, lablist, druglist, c(-1, 0), c(0.1, 1), remove_outliers_sd = 7))
   expect_error(create_drug_response(kanta, phenos, lablist, druglist, c(-1, 0), c(0.1, 1), remove_outliers_sd = "a"))
 })
+
+test_that("summarize_drug_purchases_upset creates a plot file", {
+  # Create a dummy drug.response object
+  response <- data.frame(FINNGENID = c(1, 2), response = c(1, 2))
+  lab_measurements <- data.frame(FINNGENID = c(1, 2), MEASUREMENT_VALUE_HARMONIZED = c(10, 20))
+  drug_purchases <- data.frame(
+    FINNGENID = c("FG1", "FG1", "FG2", "FG2", "FG3"),
+    ATC = c("A01", "A02", "A01", "A03", "A02")
+  )
+  
+  drug_response_obj <- drug.response(response, lab_measurements, drug_purchases, c(-1, 0), c(0.1, 1))
+  
+  # Define an output prefix
+  out_prefix <- "test_upset"
+  
+  # Run the function
+  summarize_drug_purchases_upset(drug_response_obj, out_prefix)
+  
+  # Check that the output file was created
+  output_file <- paste0(out_prefix, "_upset_plot.pdf")
+  expect_true(file.exists(output_file))
+  
+  # Clean up the created file
+  if (file.exists(output_file)) {
+    file.remove(output_file)
+  }
+})

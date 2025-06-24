@@ -17,7 +17,8 @@ Imports:
     ggpubr,
     rjson,
     DBI,
-    data.table
+    data.table,
+    UpSetR
 Suggests:
     testthat
 Encoding: UTF-8

@@ -135,7 +135,8 @@ This package provides a suite of functions for drug response analysis.
 - **`generate_response_summary(lab_measurements, before_period, after_period, ...)`**: A helper function to calculate the summary statistics for the response (e.g., median value before and after treatment). Called by `create_drug_response`.
 
 ### Summarization and Output
-- **`summarize_drug_response(drug_response, out_file_prefix)`**: Generates a PDF report with plots and tables summarizing the drug response analysis results.
+- **`summarize_drug_response(drug_response, out_file_prefix)`**: Generates a PDF report with plots and tables summarizing the drug response analysis.
+- **`summarize_drug_purchases_upset(drug_response, out_file_prefix)`**: Generates a PDF file containing an UpSet plot to visualize the intersections of drug purchases.
 - **`drug.response(...)`**: This is not a function to be called directly by the user, but rather the S3 object class that holds the results from `create_drug_response`. It's a list containing the response data, all lab measurements, all drug purchases, and the time periods used for the analysis.
 
 ## Example Workflow
@@ -188,6 +189,10 @@ response_data <- create_drug_response(
 # 5. Summarize the results
 #    This will create a PDF file with plots and text files with summary tables.
 summarize_drug_response(response_data, out_file_prefix = "statin_ldl_response_summary")
+
+# 6. (Optional) Generate an UpSet plot of drug purchase combinations
+#    This visualizes which drug combinations are most common among the cohort.
+summarize_drug_purchases_upset(response_data, out_file_prefix = "statin_purchase_combinations")
 ```
 
 This will produce files like `statin_ldl_response_summary.pdf`, `statin_ldl_response_summary_responses_by_drug.txt`, etc., in your working directory.
