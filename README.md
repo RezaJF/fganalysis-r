@@ -131,7 +131,7 @@ This package provides a suite of functions for drug response analysis.
 - **`get_first_purchase(all_phenos, druglist, ...)`**: A wrapper around `get_drug_purchases` to get only the first purchase event for each individual.
 
 ### Analysis
-- **`create_drug_response(conn, lablist, druglist, before_period, after_period, finngen_ids = NULL, remove_outliers_sd = NULL)`**: The main analysis function. It calculates the drug response based on lab value changes before and after the first drug purchase. The `remove_outliers_sd` parameter can be used to remove outliers (specify number of SDs from mean, e.g., 1-6).
+- **`create_drug_response(conn, lablist, druglist, before_period, after_period, finngen_ids = NULL, remove_outliers_sd = NULL, covariates = NULL, covariate_cols = NULL)`**: The main analysis function. It calculates the drug response based on lab value changes before and after the first drug purchase. The `remove_outliers_sd` parameter can be used to remove outliers (specify number of SDs from mean, e.g., 1-6). It can now optionally join in subject-level covariates.
 - **`generate_response_summary(lab_measurements, before_period, after_period, ...)`**: A helper function to calculate the summary statistics for the response (e.g., median value before and after treatment). Called by `create_drug_response`.
 
 ### Summarization and Output
@@ -177,6 +177,7 @@ after_window <- c(1/12, 1)   # 1 month to 1 year after drug purchase
 #    - Get the relevant lab measurements and drug purchases.
 #    - Find the first drug purchase for each individual.
 #    - Calculate the difference in median lab values between the 'after' and 'before' periods.
+#    - Optionally, join in specified covariates.
 response_data <- create_drug_response(
   conn = conn,
   lablist = lab_id,
@@ -184,6 +185,9 @@ response_data <- create_drug_response(
   before_period = before_window,
   after_period = after_window
   # Optionally remove outliers: remove_outliers_sd = 3
+  # Optionally add covariates:
+  # covariates = conn$cov_pheno,
+  # covariate_cols = c("SEX", "AGE_AT_DEATH_OR_END_OF_FOLLOWUP")
 )
 
 # 5. Summarize the results

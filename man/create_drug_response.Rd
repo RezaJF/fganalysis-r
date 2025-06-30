@@ -11,7 +11,9 @@ create_drug_response(
   before_period,
   after_period,
   finngen_ids = NULL,
-  remove_outliers_sd = NULL
+  remove_outliers_sd = NULL,
+  covariates = NULL,
+  covariate_cols = NULL
 )
 }
 \arguments{
@@ -28,6 +30,10 @@ create_drug_response(
 \item{finngen_ids}{vector of FINNGENIDs to filter the data}
 
 \item{remove_outliers_sd}{integer, if defined, remove outliers from the lab measurements. The value is the number of standard deviations from the mean to define an outlier (i.e. 1, 2, 3, 4, 5, 6)}
+
+\item{covariates}{Optional data frame with covariate data (e.g., sex, age at death)}
+
+\item{covariate_cols}{Optional character vector of column names to add from the covariates data frame}
 }
 \value{
 drug.response object

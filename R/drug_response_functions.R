@@ -31,10 +31,14 @@ drug.response <- function(responses, lab_measurements, drug_purchases, before_pe
 #' @param after_period vector with two elements, start and end of the after period
 #' @param finngen_ids vector of FINNGENIDs to filter the data
 #' @param remove_outliers_sd integer, if defined, remove outliers from the lab measurements. The value is the number of standard deviations from the mean to define an outlier (i.e. 1, 2, 3, 4, 5, 6)
+#' @param covariates Optional data frame with covariate data (e.g., sex, age at death)
+#' @param covariate_cols Optional character vector of column names to add from the covariates data frame
 #' @return drug.response object
 #' @export
 create_drug_response <- function(conn, lablist, druglist,
-before_period, after_period, finngen_ids=NULL, remove_outliers_sd=NULL) {
+before_period, after_period, finngen_ids=NULL, remove_outliers_sd=NULL,
+covariates = NULL,
+covariate_cols = NULL) {
 
   if(!inherits(conn, "fg_data_connection")) {
     stop("conn must be a fg_data_connection object")
@@ -77,7 +81,35 @@ before_period, after_period, finngen_ids=NULL, remove_outliers_sd=NULL) {
   lab_response <- generate_response_summary(lab_measurements, before_period, after_period)
   cat("Number of individuals with response data: ", nrow(lab_response), "\n")
 
-  return(drug.response(responses=lab_response, lab_measurements=lab_measurements,
+  # Add covariates if provided
+  if (!is.null(covariates) && !is.null(covariate_cols)) {
+    print(paste("Adding covariates:", paste(covariate_cols, collapse = ", ")))
+
+    # Ensure FINNGENID is in the columns for the join
+    cols_to_select <- unique(c("FINNGENID", covariate_cols))
+
+    # Check that all requested columns exist in the covariates dataframe
+    missing_cols <- setdiff(cols_to_select, colnames(covariates))
+    if (length(missing_cols) > 0) {
+      stop(paste("The following `covariate_cols` are not in the `covariates` dataframe:",
+                 paste(missing_cols, collapse = ", ")))
+    }
+
+    # Select the requested columns and ensure one row per FINNGENID
+    cov_data_to_join <- covariates %>%
+      select(all_of(cols_to_select)) %>%
+      distinct(.data$FINNGENID, .keep_all = TRUE)
+
+    # Join with the final response summary data frame
+    lab_response <- lab_response %>%
+      left_join(cov_data_to_join, by = "FINNGENID")
+
+    # Also join with the full measurements data frame
+    lab_measurements <- lab_measurements %>%
+      left_join(cov_data_to_join, by = "FINNGENID")
+  }
+
+  return(drug.response(responses = lab_response, lab_measurements=lab_measurements,
                               drug_purchases=drug_purchases, before_period, after_period))
 }
 
@@ -314,19 +346,19 @@ summarize_drug_purchases_upset <- function(drug_response, out_file_prefix) {
     as.data.frame()
 
   pdf(paste0(out_file_prefix, "_upset_plot.pdf"), width = 10, height = 7)
-  
-  UpSetR::upset(upset_data, 
+
+  UpSetR::upset(upset_data,
         nsets = ncol(upset_data),
         nintersects = 20,
         mb.ratio = c(0.6, 0.4),
-        order.by = "freq", 
-        decreasing = TRUE, 
+        order.by = "freq",
+        decreasing = TRUE,
         text.scale = 1.2,
         mainbar.y.label = "Number of FINNGEN IDs",
-        sets.x.label = "Patients per Drug Subtype", 
+        sets.x.label = "Patients per Drug Subtype",
         set_size.show = TRUE)
-        
+
   dev.off()
-  
+
   print(paste0("UpSet plot saved to ", out_file_prefix, "_upset_plot.pdf"))
 }
