@@ -230,7 +230,7 @@ test_that("create_drug_response handles covariates correctly", {
   mock_phenos <- data.frame(FINNGENID = "FG1", EVENT_AGE = 31, CODE1 = "D1", SOURCE = "PURCH")
   mock_covariates <- data.frame(
     FINNGENID = "FG1",
-    SEX = "F",
+    SEX = "female", # Test "female" string
     AGE_AT_DEATH = 80,
     UNRELATED_COL = "data"
   )
@@ -321,7 +321,7 @@ create_test_blup_data <- function() {
   # Create sex data
   sex_data <- data.frame(
     FINNGENID = individuals,
-    SEX = sample(c("M", "F"), n_individuals, replace = TRUE)
+    SEX = sample(c("male", "female"), n_individuals, replace = TRUE)
   )
 
   # Create drug.response object
@@ -339,7 +339,7 @@ test_that("calculate_blup_slopes works correctly", {
   drug_resp_obj <- create_test_blup_data()
   sex_data <- data.frame(
     FINNGENID = paste0("FG", 1:20),
-    SEX = sample(c("M", "F"), 20, replace = TRUE)
+    SEX = sample(c("male", "female"), 20, replace = TRUE)
   )
 
   # Create temporary directory for output
