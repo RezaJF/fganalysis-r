@@ -96,9 +96,15 @@ covariate_cols = NULL) {
     }
 
     # Select the requested columns and ensure one row per FINNGENID
+    # Collect the data if it's a lazy table
     cov_data_to_join <- covariates %>%
       select(all_of(cols_to_select)) %>%
       distinct(.data$FINNGENID, .keep_all = TRUE)
+
+    # If covariates is a lazy table (database connection), collect it
+    if (inherits(covariates, "tbl_lazy") || inherits(covariates, "tbl_sql")) {
+      cov_data_to_join <- dplyr::collect(cov_data_to_join)
+    }
 
     # Join with the final response summary data frame
     lab_response <- lab_response %>%
@@ -110,7 +116,7 @@ covariate_cols = NULL) {
   }
 
   return(drug.response(responses = lab_response, lab_measurements=lab_measurements,
-                              drug_purchases=drug_purchases, before_period, after_period))
+                              drug_purchases=drug_purchases, before_period = before_period, after_period = after_period))
 }
 
 quant_text <- function(vector) {
@@ -361,4 +367,266 @@ summarize_drug_purchases_upset <- function(drug_response, out_file_prefix) {
   dev.off()
 
   print(paste0("UpSet plot saved to ", out_file_prefix, "_upset_plot.pdf"))
+}
+
+#' @title Plot Distribution of Lab Values Before and After Drug Use
+#' @description Creates a boxplot comparing the distribution of lab values
+#' before and after the first drug purchase, faceted by drug type.
+#' @param drug_response A `drug.response` object.
+#' @param remove_outliers A logical indicating whether to remove outliers
+#' using the 1.5 * IQR rule. Defaults to `FALSE`.
+#' @return A `ggplot` object.
+#' @export
+plot_lab_value_distribution <- function(drug_response, remove_outliers = FALSE) {
+  if (!inherits(drug_response, "drug.reponse")) {
+    stop("Input must be a drug.reponse object.")
+  }
+
+  # Define periods from the response object for consistency
+  before_period_def <- drug_response$lab_response_period$before_period
+  after_period_def <- drug_response$lab_response_period$after_period
+
+  lab_data_periods <- drug_response$all_measurements %>%
+    filter(!is.na(.data$first_drug_age) & !is.na(.data$MEASUREMENT_VALUE_HARMONIZED)) %>%
+    mutate(period = case_when(
+      between(.data$time_to_drug, before_period_def[1], before_period_def[2]) ~ "Before",
+      between(.data$time_to_drug, after_period_def[1], after_period_def[2]) ~ "After",
+      TRUE ~ NA_character_
+    )) %>%
+    filter(!is.na(.data$period))
+
+  plot_data <- lab_data_periods
+  if (remove_outliers) {
+    plot_data <- plot_data %>%
+      group_by(.data$first_drug, .data$period) %>%
+      mutate(
+        Q1 = quantile(.data$MEASUREMENT_VALUE_HARMONIZED, 0.25, na.rm = TRUE),
+        Q3 = quantile(.data$MEASUREMENT_VALUE_HARMONIZED, 0.75, na.rm = TRUE),
+        IQR = .data$Q3 - .data$Q1
+      ) %>%
+      filter(
+        .data$MEASUREMENT_VALUE_HARMONIZED >= (.data$Q1 - 1.5 * .data$IQR) &
+        .data$MEASUREMENT_VALUE_HARMONIZED <= (.data$Q3 + 1.5 * .data$IQR)
+      ) %>%
+      ungroup()
+  }
+
+  # Generate plot
+  p <- ggplot(plot_data, aes(x = .data$period, y = .data$MEASUREMENT_VALUE_HARMONIZED, fill = .data$period)) +
+    ggplot2::geom_boxplot(outlier.shape = if (remove_outliers) NA else 19) +
+    ggpubr::stat_compare_means(method = "t.test", label = "p.format", paired = FALSE,
+                       label.x = 1.5, label.y.npc = 0.9) +
+    labs(
+      title = "Distribution of Lab Values Before and After First Drug Purchase",
+      x = "Period Relative to Drug Purchase",
+      y = "Harmonised Measurement Value"
+    ) +
+    theme_minimal() +
+    facet_wrap(~.data$first_drug, scales = "free_y")
+
+  return(p)
+}
+
+#' @title Calculate BLUP slopes for lab measurements over age
+#' @description Implements a linear mixed model (LMM) to calculate Best Linear Unbiased Predictors (BLUPs)
+#' for individual-specific slopes of lab value changes over age, following the methodology from
+#' Wiegrebe et al. (2024) Nature Communications.
+#' @param drug_response A `drug.response` object containing lab measurements
+#' @param sex_data Optional data frame with columns FINNGENID and SEX (coded as 0/1 or M/F)
+#' @param output_dir Directory where output files will be saved. Defaults to current directory
+#' @param min_measurements Minimum number of measurements per individual to include in analysis (default: 2)
+#' @return A list containing BLUP results for each OMOP_CONCEPT_ID
+#' @details The model fitted is:
+#' lab_value_i,t = β0 + β1*sex_i + β2*age_i,t + γ0i + γ1i*age_i,t + ε_i,t
+#' where γ0i and γ1i are random intercept and slope for individual i
+#' @export
+#' @import lme4
+#' @importFrom dplyr %>% group_by filter mutate select left_join distinct
+calculate_blup_slopes <- function(drug_response, sex_data = NULL, output_dir = ".",
+                                  min_measurements = 2) {
+
+  if (!inherits(drug_response, "drug.reponse")) {
+    stop("Input must be a drug.reponse object.")
+  }
+
+  # Check if lme4 is available
+  if (!requireNamespace("lme4", quietly = TRUE)) {
+    stop("Package 'lme4' is required for this function. Please install it with: install.packages('lme4')")
+  }
+
+  # Extract lab measurements
+  lab_data <- drug_response$all_measurements %>%
+    filter(!is.na(.data$MEASUREMENT_VALUE_HARMONIZED))
+
+  # Get unique OMOP concept IDs
+  concept_ids <- unique(lab_data$OMOP_CONCEPT_ID)
+
+  # Initialize results list
+  blup_results <- list()
+
+  # Process each OMOP concept ID separately
+  for (concept_id in concept_ids) {
+
+    cat(paste0("Processing OMOP_CONCEPT_ID: ", concept_id, "\n"))
+
+    # Filter data for current concept
+    concept_data <- lab_data %>%
+      filter(.data$OMOP_CONCEPT_ID == concept_id)
+
+    # Count measurements per individual
+    measurement_counts <- concept_data %>%
+      group_by(.data$FINNGENID) %>%
+      summarise(n_measurements = n()) %>%
+      filter(.data$n_measurements >= min_measurements)
+
+    # Filter to individuals with sufficient measurements
+    analysis_data <- concept_data %>%
+      filter(.data$FINNGENID %in% measurement_counts$FINNGENID)
+
+    # Add sex data if provided
+    if (!is.null(sex_data)) {
+      # Standardize sex coding to 0/1
+      sex_data <- sex_data %>%
+        mutate(SEX_CODED = case_when(
+          toupper(.data$SEX) %in% c("M", "male", "MALE", "1") ~ 1,
+          toupper(.data$SEX) %in% c("F", "female", "FEMALE", "0") ~ 0,
+          TRUE ~ NA_real_
+        ))
+
+      analysis_data <- analysis_data %>%
+        left_join(sex_data %>% select(.data$FINNGENID, .data$SEX_CODED),
+                  by = "FINNGENID")
+    } else {
+      # If no sex data provided, create dummy variable
+      analysis_data$SEX_CODED <- 0
+    }
+
+    # Remove individuals with missing sex if sex data was provided
+    if (!is.null(sex_data)) {
+      analysis_data <- analysis_data %>%
+        filter(!is.na(.data$SEX_CODED))
+    }
+
+    # Check if there's enough data
+    n_individuals <- length(unique(analysis_data$FINNGENID))
+    if (n_individuals < 10) {
+      warning(paste0("Only ", n_individuals, " individuals for OMOP_CONCEPT_ID ",
+                     concept_id, ". Skipping analysis."))
+      next
+    }
+
+    # Fit the linear mixed model
+    # Model: lab_value ~ sex + age + (age | FINNGENID)
+    # This includes random intercepts and random slopes for age
+    tryCatch({
+      if (!is.null(sex_data)) {
+        # Model with sex as fixed effect
+        lmm_model <- lme4::lmer(
+          MEASUREMENT_VALUE_HARMONIZED ~ SEX_CODED + EVENT_AGE + (EVENT_AGE | FINNGENID),
+          data = analysis_data,
+          REML = TRUE
+        )
+      } else {
+        # Model without sex effect
+        lmm_model <- lme4::lmer(
+          MEASUREMENT_VALUE_HARMONIZED ~ EVENT_AGE + (EVENT_AGE | FINNGENID),
+          data = analysis_data,
+          REML = TRUE
+        )
+      }
+
+      # Extract BLUPs (random effects)
+      random_effects <- lme4::ranef(lmm_model)$FINNGENID
+
+      # The second column contains the random slopes (γ1i)
+      blup_slopes <- data.frame(
+        FINNGENID = rownames(random_effects),
+        slope = random_effects[, "EVENT_AGE"],
+        stringsAsFactors = FALSE
+      )
+
+      # Get all unique FINNGENIDs from the original data
+      all_finngenids <- unique(lab_data$FINNGENID)
+
+      # Create output dataframe with all individuals
+      # Those not in the analysis get NA slopes
+      output_df <- data.frame(
+        FID = all_finngenids,
+        IID = all_finngenids,
+        stringsAsFactors = FALSE
+      )
+
+      # Add the slope column with appropriate name
+      slope_col_name <- paste0(concept_id, "_slope")
+      output_df[[slope_col_name]] <- NA_real_
+
+      # Fill in the calculated slopes
+      match_idx <- match(blup_slopes$FINNGENID, output_df$FID)
+      output_df[[slope_col_name]][match_idx] <- blup_slopes$slope
+
+      # Save to file
+      output_file <- file.path(output_dir, paste0(concept_id, "_DF13.tsv"))
+      write.table(output_df,
+                  file = output_file,
+                  sep = "\t",
+                  row.names = FALSE,
+                  quote = FALSE)
+
+      cat(paste0("Saved results to: ", output_file, "\n"))
+
+      # Store results
+      blup_results[[as.character(concept_id)]] <- list(
+        model = lmm_model,
+        blup_slopes = blup_slopes,
+        n_individuals = n_individuals,
+        output_file = output_file
+      )
+
+    }, error = function(e) {
+      warning(paste0("Error fitting model for OMOP_CONCEPT_ID ", concept_id,
+                     ": ", e$message))
+    })
+  }
+
+  cat("BLUP calculation completed.\n")
+
+  # Return results invisibly
+  invisible(blup_results)
+}
+
+#' @title Summarize BLUP slope results
+#' @description Provides summary statistics for BLUP slope calculations
+#' @param blup_results Results from calculate_blup_slopes function
+#' @return A data frame with summary statistics for each OMOP concept
+#' @export
+summarize_blup_results <- function(blup_results) {
+
+  if (length(blup_results) == 0) {
+    return(data.frame(
+      OMOP_CONCEPT_ID = character(),
+      n_individuals = integer(),
+      mean_slope = numeric(),
+      sd_slope = numeric(),
+      min_slope = numeric(),
+      max_slope = numeric(),
+      stringsAsFactors = FALSE
+    ))
+  }
+
+  summary_df <- do.call(rbind, lapply(names(blup_results), function(concept_id) {
+    result <- blup_results[[concept_id]]
+    slopes <- result$blup_slopes$slope
+
+    data.frame(
+      OMOP_CONCEPT_ID = concept_id,
+      n_individuals = result$n_individuals,
+      mean_slope = mean(slopes, na.rm = TRUE),
+      sd_slope = sd(slopes, na.rm = TRUE),
+      min_slope = min(slopes, na.rm = TRUE),
+      max_slope = max(slopes, na.rm = TRUE),
+      stringsAsFactors = FALSE
+    )
+  }))
+
+  return(summary_df)
 }
