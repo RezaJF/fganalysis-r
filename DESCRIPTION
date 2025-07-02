@@ -18,7 +18,12 @@ Imports:
     rjson,
     DBI,
     data.table,
-    UpSetR
+    UpSetR,
+    tidyr,
+    lme4,
+    rlang,
+    grDevices,
+    utils
 Suggests:
     testthat
 Encoding: UTF-8

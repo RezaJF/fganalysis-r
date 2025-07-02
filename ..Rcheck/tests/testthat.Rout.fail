@@ -1,0 +1,98 @@
+
+R version 4.5.1 (2025-06-13) -- "Great Square Root"
+Copyright (C) 2025 The R Foundation for Statistical Computing
+Platform: aarch64-apple-darwin20
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> # This file is used to run all the tests in the testthat directory.
+> library(testthat)
+> library(fganalysis)
+> 
+> test_check("fganalysis")
+[1] "Querying lab measurements..."
+[1] "Querying purchases..."
+[1] "generating response summary..."
+Number of individuals with response data:  2 
+[1] "Querying lab measurements..."
+[1] "Removed 2 outliers based on 1 standard deviations from the mean."
+[1] "Querying purchases..."
+[1] "generating response summary..."
+Number of individuals with response data:  2 
+[1] "Querying lab measurements..."
+[1] "Querying lab measurements..."
+[1] "UpSet plot saved to test_upset_upset_plot.pdf"
+[1] "Querying lab measurements..."
+[1] "Querying purchases..."
+[1] "generating response summary..."
+Number of individuals with response data:  0 
+[1] "Adding covariates: SEX, AGE_AT_DEATH"
+[1] "Querying lab measurements..."
+[1] "Querying purchases..."
+[1] "generating response summary..."
+Number of individuals with response data:  0 
+[1] "Querying lab measurements..."
+[1] "Querying purchases..."
+[1] "generating response summary..."
+Number of individuals with response data:  0 
+[1] "Adding covariates: SEX, NON_EXISTENT_COL"
+Processing OMOP_CONCEPT_ID: 3004410
+Processing OMOP_CONCEPT_ID: 3023602
+BLUP calculation completed.
+Processing OMOP_CONCEPT_ID: 3004410
+Processing OMOP_CONCEPT_ID: 3023602
+BLUP calculation completed.
+Processing OMOP_CONCEPT_ID: 3004410
+Processing OMOP_CONCEPT_ID: 3023602
+BLUP calculation completed.
+Processing OMOP_CONCEPT_ID: 3004410
+Processing OMOP_CONCEPT_ID: 3023602
+BLUP calculation completed.
+Processing: test_variance.tsv
+  Saved normalized file: test_variance_qnorm.tsv
+Processing OMOP_CONCEPT_ID: 3001308
+  Successfully fitted full model for OMOP_CONCEPT_ID: 3001308
+  Calculating QC metrics...
+  QC: Correlation between BLUP and fixed slopes = 1
+Saved results to: /var/folders/zr/hzjtl6k179vgknqxcdltmnxc0000gp/T//RtmpRQjPHc/working_dir/RtmpzlVDjn/3001308_DF13.tsv
+BLUP calculation completed.
+Processing OMOP_CONCEPT_ID: 3001308
+  Successfully fitted full model for OMOP_CONCEPT_ID: 3001308
+Saved results to: /var/folders/zr/hzjtl6k179vgknqxcdltmnxc0000gp/T//RtmpRQjPHc/working_dir/RtmpzlVDjn/3001308_DF13.tsv
+BLUP calculation completed.
+Processing OMOP_CONCEPT_ID: 3001308
+  Successfully fitted full model for OMOP_CONCEPT_ID: 3001308
+Saved results to: /var/folders/zr/hzjtl6k179vgknqxcdltmnxc0000gp/T//RtmpRQjPHc/working_dir/RtmpzlVDjn/3001308_DF13.tsv
+BLUP calculation completed.
+[ FAIL 1 | WARN 16 | SKIP 1 | PASS 73 ]
+
+══ Skipped tests (1) ═══════════════════════════════════════════════════════════
+• Requires full drug_response object setup (1): 'test-qc_functions.R:101:3'
+
+══ Failed tests ════════════════════════════════════════════════════════════════
+── Failure ('test-drug_response_functions.R:390:3'): calculate_blup_slopes works correctly ──
+`calculate_blup_slopes(list())` threw an error with unexpected message.
+Expected match: "Input must be a drug.reponse object."
+Actual message: "Input must be either a drug.reponse object or a data frame with lab measurements."
+Backtrace:
+    ▆
+ 1. ├─testthat::expect_error(calculate_blup_slopes(list()), "Input must be a drug.reponse object.") at test-drug_response_functions.R:390:3
+ 2. │ └─testthat:::quasi_capture(...)
+ 3. │   ├─testthat (local) .capture(...)
+ 4. │   │ └─base::withCallingHandlers(...)
+ 5. │   └─rlang::eval_bare(quo_get_expr(.quo), quo_get_env(.quo))
+ 6. └─fganalysis::calculate_blup_slopes(list())
+
+[ FAIL 1 | WARN 16 | SKIP 1 | PASS 73 ]
+Error: Test failures
+Execution halted

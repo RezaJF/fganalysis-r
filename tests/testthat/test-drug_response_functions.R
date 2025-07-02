@@ -200,14 +200,14 @@ test_that("plot_lab_value_distribution handles input and options correctly", {
 
   # Test 1: Function returns a ggplot object without outlier removal
   p1 <- plot_lab_value_distribution(drug_resp_obj, remove_outliers = FALSE)
-  expect_true(ggplot2::is.ggplot(p1))
+  expect_true(ggplot2::is_ggplot(p1))
 
   # Check that the outlier is present in the plot data
   expect_true(500 %in% p1$data$MEASUREMENT_VALUE_HARMONIZED)
 
   # Test 2: Function returns a ggplot object with outlier removal
   p2 <- plot_lab_value_distribution(drug_resp_obj, remove_outliers = TRUE)
-  expect_true(ggplot2::is.ggplot(p2))
+  expect_true(ggplot2::is_ggplot(p2))
 
   # Check that the outlier has been removed from the plot data
   expect_false(500 %in% p2$data$MEASUREMENT_VALUE_HARMONIZED)
@@ -392,7 +392,7 @@ test_that("calculate_blup_slopes works correctly", {
 
 test_that("summarize_blup_results works correctly", {
   # Create test data and run BLUP analysis
-  drug_resp_obj <- create_test_blup_data()
+  drug_resp_obj <- create_test_blup_data(include_sex = TRUE)
   temp_dir <- tempdir()
 
   blup_results <- calculate_blup_slopes(drug_resp_obj, output_dir = temp_dir)

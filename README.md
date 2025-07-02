@@ -4,6 +4,36 @@
 
 The `fganalysis` is an R package designed for common analyses performed in FinnGen. It provides functions for data processing, summarization, and visualization of lab measurements and drug purchases to study drug response.
 
+## Package Structure
+
+The package is organized into logical modules for better maintainability:
+
+### R/ Directory Structure
+
+- **`connections.R`** - Database connection management
+  - `connect_fgdata()` - Establishes connections to FinnGen data sources
+
+- **`data_access.R`** - Data retrieval functions
+  - `get_lab_measurements()` - Retrieves lab measurement data
+  - `get_drug_purchases()` - Retrieves drug purchase data
+  - `get_first_purchase()` - Gets first drug purchase for each individual
+
+- **`drug_response_core.R`** - Core drug response analysis
+  - `drug.response()` - Creates drug response S3 object
+  - `create_drug_response()` - Main function for drug response analysis
+  - `generate_response_summary()` - Summarizes drug responses
+
+- **`visualization.R`** - Plotting and visualization functions
+  - `summarize_drug_response()` - Creates comprehensive summary plots and tables
+  - `plot_lab_value_distribution()` - Boxplot comparison of lab values
+  - `summarize_drug_purchases_upset()` - UpSet plot for drug combinations
+
+- **`blup_analysis.R`** - BLUP/Linear Mixed Model analysis
+  - `calculate_blup_slopes()` - Calculates individual-specific slopes using LMM
+  - `summarize_blup_results()` - Summarizes BLUP analysis results
+
+This modular structure makes it easier to maintain, test, and extend the package functionality.
+
 ## Installation
 
 To use this package, you can install it from a local source. First, ensure you have the `devtools` package installed in R.
