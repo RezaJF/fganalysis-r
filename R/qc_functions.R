@@ -1,0 +1,250 @@
+#' @importFrom stats qnorm quantile cor lm predict sd
+#' @importFrom dplyr %>% group_by summarise mutate select n
+#' @importFrom graphics hist par text plot.new
+#' @importFrom grDevices dev.new
+NULL
+
+#' @title Quantile Normalize Values
+#' @description Performs quantile normalization on a numeric vector
+#' @param x Numeric vector to normalize
+#' @return Quantile normalized vector with same length as input
+#' @export
+quantile_normalize <- function(x) {
+  # Remove NAs for ranking but keep track of their positions
+  na_pos <- is.na(x)
+  x_no_na <- x[!na_pos]
+
+  # If all values are NA or vector is empty, return the original vector
+  if (length(x_no_na) == 0) {
+    return(x)
+  }
+
+  # Rank the values, handling ties by taking their mean
+  r <- rank(x_no_na, ties.method = "average")
+
+  # Calculate normalized values using normal distribution
+  norm_vals <- qnorm(r / (length(r) + 1))
+
+  # Put the normalized values back in the original vector
+  x_norm <- x
+  x_norm[!na_pos] <- norm_vals
+
+  return(x_norm)
+}
+
+#' @title Calculate Fixed-Effect Slopes
+#' @description Calculates individual-specific slopes using simple linear regression
+#' @param data Data frame with columns: FINNGENID, EVENT_AGE, MEASUREMENT_VALUE_HARMONIZED
+#' @param min_measurements Minimum number of measurements per individual (default: 2)
+#' @return Data frame with FINNGENID and fixed_slope columns
+#' @export
+calculate_fixed_slopes <- function(data, min_measurements = 2) {
+  # Calculate slopes for each individual
+  fixed_slopes <- data %>%
+    group_by(.data$FINNGENID) %>%
+    summarise(
+      n_measurements = n(),
+      fixed_slope = if(n() >= min_measurements) {
+        tryCatch({
+          lm(.data$MEASUREMENT_VALUE_HARMONIZED ~ .data$EVENT_AGE)$coefficients[2]
+        }, error = function(e) NA_real_)
+      } else {
+        NA_real_
+      }
+    ) %>%
+    filter(!is.na(.data$fixed_slope)) %>%
+    select(.data$FINNGENID, .data$fixed_slope)
+
+  return(as.data.frame(fixed_slopes))
+}
+
+#' @title Process Variance Files with Quantile Normalization
+#' @description Reads variance files, adds quantile normalized column, and generates summary
+#' @param output_dir Directory containing variance files
+#' @param generate_plots Logical, whether to generate comparison plots (default: FALSE)
+#' @param save_normalized Logical, whether to save files with normalized column (default: TRUE)
+#' @return Summary data frame with statistics for original and normalized values
+#' @export
+process_variance_files <- function(output_dir = ".", generate_plots = FALSE,
+                                   save_normalized = TRUE) {
+
+  # List all *_variance.tsv files
+  variance_files <- list.files(path = output_dir, pattern = "_variance\\.tsv$",
+                               full.names = TRUE)
+
+  if (length(variance_files) == 0) {
+    warning("No variance files found in the specified directory.")
+    return(NULL)
+  }
+
+  # Initialize summary list
+  summary_list <- list()
+
+  for (file_path in variance_files) {
+    file_name <- basename(file_path)
+    cat(paste0("Processing: ", file_name, "\n"))
+
+    # Read the file
+    df <- read.table(file_path, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+
+    # Infer the variance column name
+    variance_col <- sub("\\.tsv$", "", file_name)
+
+    # Check if the column exists
+    if (!variance_col %in% colnames(df)) {
+      warning(sprintf("Column %s not found in %s", variance_col, file_name))
+      next
+    }
+
+    # Apply quantile normalization
+    norm_col_name <- paste0(variance_col, "_qnorm")
+    df[[norm_col_name]] <- quantile_normalize(df[[variance_col]])
+
+    # Save normalized file if requested
+    if (save_normalized) {
+      output_path <- sub("\\.tsv$", "_qnorm.tsv", file_path)
+      write.table(df, file = output_path, sep = "\t", row.names = FALSE, quote = FALSE)
+      cat(paste0("  Saved normalized file: ", basename(output_path), "\n"))
+    }
+
+    # Calculate statistics
+    total_records <- nrow(df)
+    non_missing <- sum(!is.na(df[[variance_col]]))
+
+    # Summary statistics for original values
+    orig_summary <- summary(df[[variance_col]])
+    orig_sd <- sd(df[[variance_col]], na.rm = TRUE)
+
+    # Summary statistics for normalized values
+    norm_summary <- summary(df[[norm_col_name]])
+    norm_sd <- sd(df[[norm_col_name]], na.rm = TRUE)
+
+    # Store results
+    summary_list[[file_name]] <- list(
+      file = file_name,
+      total_records = total_records,
+      non_missing = non_missing,
+      orig_summary = orig_summary,
+      orig_sd = orig_sd,
+      norm_summary = norm_summary,
+      norm_sd = norm_sd,
+      orig_data = df[[variance_col]],
+      norm_data = df[[norm_col_name]]
+    )
+  }
+
+  # Create summary table
+  summary_table <- create_variance_summary_table(summary_list)
+
+  # Generate plots if requested
+  if (generate_plots && length(summary_list) > 0) {
+    generate_variance_plots(summary_list)
+  }
+
+  return(summary_table)
+}
+
+#' @title Create Variance Summary Table
+#' @description Creates a summary table from processed variance data
+#' @param summary_list List of summary statistics from process_variance_files
+#' @return Data frame with summary statistics
+create_variance_summary_table <- function(summary_list) {
+
+  if (length(summary_list) == 0) {
+    return(NULL)
+  }
+
+  # Helper function to safely extract values
+  safe_extract <- function(summary_obj, name) {
+    if (name %in% names(summary_obj)) {
+      return(as.numeric(summary_obj[name]))
+    } else {
+      return(NA_real_)
+    }
+  }
+
+  # Build summary table
+  summary_rows <- lapply(names(summary_list), function(file_name) {
+    res <- summary_list[[file_name]]
+    orig_stats <- res$orig_summary
+    norm_stats <- res$norm_summary
+
+    data.frame(
+      File = res$file,
+      Total_records = res$total_records,
+      Non_missing = res$non_missing,
+      Orig_SD = res$orig_sd,
+      Orig_Min = safe_extract(orig_stats, "Min."),
+      Orig_Q1 = safe_extract(orig_stats, "1st Qu."),
+      Orig_Median = safe_extract(orig_stats, "Median"),
+      Orig_Mean = safe_extract(orig_stats, "Mean"),
+      Orig_Q3 = safe_extract(orig_stats, "3rd Qu."),
+      Orig_Max = safe_extract(orig_stats, "Max."),
+      Norm_SD = res$norm_sd,
+      Norm_Min = safe_extract(norm_stats, "Min."),
+      Norm_Q1 = safe_extract(norm_stats, "1st Qu."),
+      Norm_Median = safe_extract(norm_stats, "Median"),
+      Norm_Mean = safe_extract(norm_stats, "Mean"),
+      Norm_Q3 = safe_extract(norm_stats, "3rd Qu."),
+      Norm_Max = safe_extract(norm_stats, "Max."),
+      stringsAsFactors = FALSE
+    )
+  })
+
+  summary_table <- do.call(rbind, summary_rows)
+
+  return(summary_table)
+}
+
+#' @title Generate Variance Comparison Plots
+#' @description Generates plots comparing original and normalized variance distributions
+#' @param summary_list List of summary statistics from process_variance_files
+#' @importFrom grDevices dev.new
+#' @importFrom graphics hist par text
+generate_variance_plots <- function(summary_list) {
+
+  # Save original par settings
+  old_par <- par(no.readonly = TRUE)
+  on.exit(par(old_par))
+
+  for (i in seq_along(summary_list)) {
+    res <- summary_list[[names(summary_list)[i]]]
+
+    # Set up 2x1 plotting layout
+    par(mfrow = c(2, 1))
+
+    # Original distribution
+    orig_data <- res$orig_data[!is.na(res$orig_data)]
+    if (length(orig_data) > 0) {
+      hist(orig_data,
+           main = paste("Original Distribution:", sub("_variance\\.tsv$", "", res$file)),
+           xlab = "Variance",
+           ylab = "Frequency",
+           col = "lightblue",
+           border = "black")
+    } else {
+      plot.new()
+      text(0.5, 0.5, "No data available", cex = 1.5)
+    }
+
+    # Normalized distribution
+    norm_data <- res$norm_data[!is.na(res$norm_data)]
+    if (length(norm_data) > 0) {
+      hist(norm_data,
+           main = paste("Normalized Distribution:", sub("_variance\\.tsv$", "", res$file)),
+           xlab = "Normalized Variance",
+           ylab = "Frequency",
+           col = "lightgreen",
+           border = "black")
+    } else {
+      plot.new()
+      text(0.5, 0.5, "No normalized data available", cex = 1.5)
+    }
+
+    # Pause between plots if there are more files
+    if (i < length(summary_list)) {
+      cat("Press [Enter] to see next plot...")
+      readline()
+    }
+  }
+}

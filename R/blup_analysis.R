@@ -12,6 +12,12 @@ NULL
 #' @param min_measurements Minimum number of measurements per individual to include in analysis (default: 2)
 #' @param include_sex Logical indicating whether to include sex as a fixed effect in the model (default: TRUE).
 #' If TRUE and SEX column is not found, an error will be raised with instructions.
+#' @param debug_dir Optional path to a directory where debugging information (problematic models and data) will be saved. If `NULL` (default), no debug files are saved.
+#' @param drug_exposed_only Logical indicating whether to restrict analysis to individuals with recorded drug purchases (default: FALSE).
+#' When TRUE, separate analyses are performed for each unique ATC code.
+#' @param calculate_post_variance Logical indicating whether to calculate variance of lab values in the post-drug period (default: FALSE).
+#' @param calculate_qc Logical indicating whether to calculate quality control metrics including correlation between fixed-effect and BLUP slopes (default: FALSE).
+#' @param normalize_variance Logical indicating whether to add quantile normalized variance to output files (default: FALSE).
 #' @return A list containing BLUP results for each OMOP_CONCEPT_ID
 #' @details The model fitted is:
 #' lab_value_i,t = β0 + β1*sex_i + β2*age_i,t + γ0i + γ1i*age_i,t + ε_i,t
@@ -29,7 +35,12 @@ NULL
 #' The output slopes are in original units (lab value change per year).
 #' @export
 calculate_blup_slopes <- function(drug_response, output_dir = ".",
-                                  min_measurements = 2, include_sex = TRUE) {
+                                  min_measurements = 2, include_sex = TRUE,
+                                  debug_dir = NULL,
+                                  drug_exposed_only = FALSE,
+                                  calculate_post_variance = FALSE,
+                                  calculate_qc = FALSE,
+                                  normalize_variance = FALSE) {
 
   if (!inherits(drug_response, "drug.reponse")) {
     stop("Input must be a drug.reponse object.")

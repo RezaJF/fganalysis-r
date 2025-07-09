@@ -32,6 +32,13 @@ The package is organized into logical modules for better maintainability:
   - `calculate_blup_slopes()` - Calculates individual-specific slopes using LMM
   - `summarize_blup_results()` - Summarizes BLUP analysis results
 
+- **`qc_functions.R`** - Quality control and normalization functions
+  - `quantile_normalize()` - Performs quantile normalization on numeric vectors
+  - `calculate_fixed_slopes()` - Calculates fixed-effect slopes for comparison with BLUPs
+  - `process_variance_files()` - Processes variance files with quantile normalization
+  - `create_variance_summary_table()` - Creates summary statistics table
+  - `generate_variance_plots()` - Generates comparison plots for variance distributions
+
 This modular structure makes it easier to maintain, test, and extend the package functionality.
 
 ## Installation
@@ -168,6 +175,99 @@ This package provides a suite of functions for drug response analysis.
 - **`summarize_drug_response(drug_response, out_file_prefix)`**: Generates a PDF report with plots and tables summarizing the drug response analysis.
 - **`summarize_drug_purchases_upset(drug_response, out_file_prefix)`**: Generates a PDF file containing an UpSet plot to visualize the intersections of drug purchases.
 - **`drug.response(...)`**: This is not a function to be called directly by the user, but rather the S3 object class that holds the results from `create_drug_response`. It's a list containing the response data, all lab measurements, all drug purchases, and the time periods used for the analysis.
+- **`plot_lab_value_distribution(drug_response, remove_outliers = FALSE)`**: Creates and returns a `ggplot` object containing boxplots that compare the distribution of lab values before and after the first drug purchase. The plot is faceted by drug type and includes a t-test p-value to compare the distributions in each facet.
+
+### BLUP Analysis (Linear Mixed Models)
+- **`calculate_blup_slopes(drug_response, output_dir = ".", min_measurements = 2, include_sex = TRUE, calculate_qc = FALSE, normalize_variance = FALSE)`**: Implements a linear mixed model (LMM) to calculate Best Linear Unbiased Predictors (BLUPs) for individual-specific slopes of lab value changes over age. This follows the methodology from [Wiegrebe et al. (2024) Nature Communications](https://www.nature.com/articles/s41467-024-54483-9). The function:
+  - Fits a model: `lab_value ~ sex + age + (age | FINNGENID)` with random intercepts and slopes
+  - Sex is coded according to the PLINK/REGENIE standard (1=Male, 2=Female, 0=Missing/Unknown)
+  - If `include_sex = TRUE` (default), the function expects a SEX column in the drug_response object. If not found, it will raise an error with instructions to use `create_drug_response()` with appropriate covariates
+  - If `include_sex = FALSE`, all subjects are coded as male (1) and sex is not included in the model
+  - Includes robust convergence handling: scales age for numerical stability and falls back to simpler models if needed
+  - Outputs tab-delimited files (`{OMOP_CONCEPT_ID}_DF13.tsv`) with columns: FID, IID, and {OMOP_CONCEPT_ID}_slope
+  - **NEW: Quality Control Features**:
+    - When `calculate_qc = TRUE`: Calculates fixed-effect slopes for comparison with BLUPs and reports correlation
+    - When `normalize_variance = TRUE`: Adds quantile-normalized variance column to variance output files
+    - QC correlation helps validate that random effects are capturing individual variation appropriately
+  - Returns a list with model details and BLUP estimates for each lab measurement type
+
+#### Scaling and Back-transformation Note
+To improve model convergence, the function standardizes both age and lab values:
+- **Scaling**: Both variables are centered (mean-subtracted) and divided by their standard deviations
+  - `age_scaled = (age - mean(age)) / sd(age)`
+  - `lab_scaled = (lab - mean(lab)) / sd(lab)`
+- **Model fitting**: The LMM is fitted on scaled data, producing slopes in units of SD(lab)/SD(age)
+- **Back-transformation**: Slopes are converted to original units (lab value change per year):
+  - `original_slope = scaled_slope × (sd(lab) / sd(age))`
+- This approach maintains numerical stability while preserving interpretability
+
+#### BLUP Analysis Workflow
+
+```mermaid
+flowchart TD
+    A[drug_response object] --> B{Check SEX column}
+    B -->|Present| C[Code SEX: 1=M, 2=F, 0=Missing]
+    B -->|Missing & include_sex=TRUE| D[Error: Add SEX via create_drug_response]
+    B -->|Missing & include_sex=FALSE| E[Set all SEX=1]
+
+    C --> F[For each OMOP_CONCEPT_ID]
+    E --> F
+
+    F --> G{Sufficient data?}
+    G -->|< 10 individuals| H[Skip concept]
+    G -->|>= 10 individuals| I[Standardize variables]
+
+    I --> J[Scale age by SD]
+    I --> K[Scale lab values by SD]
+
+    J --> L[Fit LMM with random slopes]
+    K --> L
+
+    L --> M{Model converged?}
+    M -->|Yes| N[Extract BLUPs]
+    M -->|No| O[Try uncorrelated model]
+
+    O --> P{Model converged?}
+    P -->|Yes| N
+    P -->|No| Q[Skip concept with warning]
+
+    N --> R[Back-transform slopes]
+    R --> T{calculate_qc?}
+    T -->|Yes| U[Calculate fixed slopes]
+    T -->|No| S[Save to TSV file]
+
+    U --> V[Compute correlation]
+    V --> S
+
+    S --> W{calculate_post_variance?}
+    W -->|Yes| X[Calculate variance]
+    W -->|No| Z[Complete]
+
+    X --> Y{normalize_variance?}
+    Y -->|Yes| AA[Add qnorm column]
+    Y -->|No| AB[Save variance file]
+    AA --> AB
+    AB --> Z
+
+    style D fill:#f96
+    style H fill:#fc6
+    style Q fill:#fc6
+    style S fill:#9f6
+    style V fill:#6cf
+    style AA fill:#6cf
+```
+
+- **`summarize_blup_results(blup_results)`**: Provides summary statistics (mean, SD, min, max) for the BLUP slopes from each OMOP concept.
+
+### Quality Control and Normalization Functions
+- **`quantile_normalize(x)`**: Performs quantile normalization on a numeric vector, transforming it to follow a standard normal distribution while preserving rank order.
+- **`calculate_fixed_slopes(data, min_measurements = 2)`**: Calculates individual-specific slopes using simple linear regression (fixed effects only) for comparison with BLUP estimates.
+- **`process_variance_files(output_dir = ".", generate_plots = FALSE, save_normalized = TRUE)`**:
+  - Reads all `*_variance.tsv` files in the specified directory
+  - Adds quantile-normalized variance columns
+  - Generates summary statistics for both original and normalized values
+  - Optionally creates comparison plots showing distributions before/after normalization
+  - Saves files with `_qnorm.tsv` suffix containing the normalized data
 
 ## Example Workflow
 
@@ -227,6 +327,35 @@ summarize_drug_response(response_data, out_file_prefix = "statin_ldl_response_su
 # 6. (Optional) Generate an UpSet plot of drug purchase combinations
 #    This visualizes which drug combinations are most common among the cohort.
 summarize_drug_purchases_upset(response_data, out_file_prefix = "statin_purchase_combinations")
+
+# 7. (Optional) Create a boxplot of lab value distributions
+#    This function returns a ggplot object that can be printed or saved.
+lab_distribution_plot <- plot_lab_value_distribution(response_data, remove_outliers = TRUE)
+
+# Print the plot to the active graphics device
+print(lab_distribution_plot)
+
+# Or save it to a file
+ggsave("statin_ldl_distribution.pdf", plot = lab_distribution_plot, width = 10, height = 8)
+
+# 8. (Optional) Calculate BLUP slopes for longitudinal trajectories
+#    This estimates individual-specific rates of lab value change over age
+#    Note: SEX data must be included in the drug_response object via create_drug_response()
+blup_results <- calculate_blup_slopes(response_data,
+                                      output_dir = "blup_output",
+                                      calculate_qc = TRUE,  # NEW: Calculate QC metrics
+                                      normalize_variance = TRUE)  # NEW: Add qnorm to variance files
+
+# Summarize the BLUP results
+blup_summary <- summarize_blup_results(blup_results)
+print(blup_summary)
+
+# 9. (Optional) Process variance files with quantile normalization
+#    This creates summary statistics and comparison plots
+variance_summary <- process_variance_files(output_dir = "blup_output",
+                                           generate_plots = TRUE,
+                                           save_normalized = TRUE)
+print(variance_summary)
 ```
 
 This will produce files like `statin_ldl_response_summary.pdf`, `statin_ldl_response_summary_responses_by_drug.txt`, etc., in your working directory.
