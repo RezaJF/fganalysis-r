@@ -381,7 +381,7 @@ test_that("calculate_blup_slopes works correctly", {
   # Test 4: Function throws error for invalid input
   expect_error(
     calculate_blup_slopes(list()),
-    "Input must be a drug.reponse object."
+    "Input must be either a drug.reponse object or a data frame with lab measurements."
   )
 
   # Clean up temporary files
@@ -417,4 +417,114 @@ test_that("summarize_blup_results works correctly", {
   for (concept_id in names(blup_results)) {
     file.remove(file.path(temp_dir, paste0(concept_id, "_DF13.tsv")))
   }
+})
+
+test_that("get_lab_measurements can pull covariates", {
+  # Create mock lab data
+  mock_labs <- data.frame(
+    FINNGENID = rep(c("FG001", "FG002", "FG003"), each = 5),
+    OMOP_CONCEPT_ID = 3000963,
+    EVENT_AGE = rep(seq(50, 54), 3),
+    MEASUREMENT_VALUE_HARMONIZED = rnorm(15, mean = 100, sd = 10)
+  )
+
+  # Create mock covariate data
+  mock_covariates <- data.frame(
+    FINNGENID = c("FG001", "FG002", "FG003", "FG004"),
+    SEX = c("M", "F", "M", "F"),
+    AGE_AT_DEATH_OR_END_OF_FOLLOWUP = c(75, 80, 85, 90),
+    BMI = c(25.1, 28.3, 22.5, 26.7)
+  )
+
+  # Test 1: Pull with SEX covariate
+  result <- get_lab_measurements(
+    all_labs = mock_labs,
+    lablist = 3000963,
+    covariates = mock_covariates,
+    covariate_cols = c("SEX")
+  )
+
+  expect_true("SEX" %in% colnames(result))
+  expect_equal(nrow(result), 15)
+  expect_equal(result$SEX[result$FINNGENID == "FG001"][1], "M")
+  expect_equal(result$SEX[result$FINNGENID == "FG002"][1], "F")
+
+  # Test 2: Pull with multiple covariates
+  result2 <- get_lab_measurements(
+    all_labs = mock_labs,
+    lablist = 3000963,
+    covariates = mock_covariates,
+    covariate_cols = c("SEX", "AGE_AT_DEATH_OR_END_OF_FOLLOWUP")
+  )
+
+  expect_true(all(c("SEX", "AGE_AT_DEATH_OR_END_OF_FOLLOWUP") %in% colnames(result2)))
+  expect_equal(result2$AGE_AT_DEATH_OR_END_OF_FOLLOWUP[result2$FINNGENID == "FG001"][1], 75)
+
+  # Test 3: Error when requesting non-existent covariate columns
+  expect_error(
+    get_lab_measurements(
+      all_labs = mock_labs,
+      lablist = 3000963,
+      covariates = mock_covariates,
+      covariate_cols = c("SEX", "NONEXISTENT_COL")
+    ),
+    "The following `covariate_cols` are not in the `covariates` dataframe: NONEXISTENT_COL"
+  )
+
+  # Test 4: No error when covariates or covariate_cols is NULL
+  result3 <- get_lab_measurements(
+    all_labs = mock_labs,
+    lablist = 3000963,
+    covariates = NULL,
+    covariate_cols = c("SEX")
+  )
+  expect_false("SEX" %in% colnames(result3))
+
+  result4 <- get_lab_measurements(
+    all_labs = mock_labs,
+    lablist = 3000963,
+    covariates = mock_covariates,
+    covariate_cols = NULL
+  )
+  expect_false("SEX" %in% colnames(result4))
+})
+
+test_that("calculate_blup_slopes works with lab measurements that include covariates", {
+  # Create mock lab data with covariates and more realistic variation
+  set.seed(123)
+  n_individuals <- 30
+  n_measurements <- 15
+
+  # Generate data with individual-specific slopes
+  mock_data <- do.call(rbind, lapply(1:n_individuals, function(i) {
+    # Individual-specific intercept and slope
+    intercept <- rnorm(1, mean = 100, sd = 10)
+    slope <- rnorm(1, mean = 0.5, sd = 0.2)
+    ages <- seq(50, 64, length.out = n_measurements)
+
+    data.frame(
+      FINNGENID = paste0("FG", sprintf("%03d", i)),
+      OMOP_CONCEPT_ID = 3000963,
+      EVENT_AGE = ages,
+      MEASUREMENT_VALUE_HARMONIZED = intercept + slope * (ages - 50) + rnorm(n_measurements, 0, 2),
+      SEX = ifelse(i <= n_individuals/2, "M", "F")
+    )
+  }))
+
+  # Test that BLUP calculation works with SEX included
+  expect_no_error({
+    result <- calculate_blup_slopes(
+      data = mock_data,
+      output_dir = tempdir(),
+      include_sex = TRUE,
+      min_measurements = 5
+    )
+  })
+
+  # Verify output file exists
+  output_file <- file.path(tempdir(), "3000963_DF13.tsv")
+  expect_true(file.exists(output_file))
+
+  # Clean up
+  unlink(output_file)
 })

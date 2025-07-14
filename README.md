@@ -163,7 +163,7 @@ This package provides a suite of functions for drug response analysis.
 - **`connect_fgdata(path_to_conf)`**: Connects to the databases specified in the JSON configuration file and returns a `fg_data_connection` object.
 
 ### Data Retrieval
-- **`get_lab_measurements(all_labs, lablist, ...)`**: Extracts lab measurements for specified OMOP concept IDs.
+- **`get_lab_measurements(all_labs, lablist, ..., covariates = NULL, covariate_cols = NULL)`**: Extracts lab measurements for specified OMOP concept IDs. **NEW**: Can now optionally join covariates (e.g., SEX, AGE_AT_DEATH_OR_END_OF_FOLLOWUP) from a separate table.
 - **`get_drug_purchases(all_phenos, druglist, ...)`**: Extracts drug purchases for specified ATC codes. The matching is done on the beginning of the ATC code.
 - **`get_first_purchase(all_phenos, druglist, ...)`**: A wrapper around `get_drug_purchases` to get only the first purchase event for each individual.
 
@@ -178,7 +178,8 @@ This package provides a suite of functions for drug response analysis.
 - **`plot_lab_value_distribution(drug_response, remove_outliers = FALSE)`**: Creates and returns a `ggplot` object containing boxplots that compare the distribution of lab values before and after the first drug purchase. The plot is faceted by drug type and includes a t-test p-value to compare the distributions in each facet.
 
 ### BLUP Analysis (Linear Mixed Models)
-- **`calculate_blup_slopes(drug_response, output_dir = ".", min_measurements = 2, include_sex = TRUE, calculate_qc = FALSE, normalize_variance = FALSE)`**: Implements a linear mixed model (LMM) to calculate Best Linear Unbiased Predictors (BLUPs) for individual-specific slopes of lab value changes over age. This follows the methodology from [Wiegrebe et al. (2024) Nature Communications](https://www.nature.com/articles/s41467-024-54483-9). The function:
+- **`calculate_blup_slopes(data, output_dir = ".", min_measurements = 2, include_sex = TRUE, calculate_qc = FALSE, normalize_variance = FALSE)`**: Implements a linear mixed model (LMM) to calculate Best Linear Unbiased Predictors (BLUPs) for individual-specific slopes of lab value changes over age. This follows the methodology from [Wiegrebe et al. (2024) Nature Communications](https://www.nature.com/articles/s41467-024-54483-9). The function:
+  - **NEW**: Accepts either a `drug.response` object OR a data frame with lab measurements (must contain: FINNGENID, OMOP_CONCEPT_ID, EVENT_AGE, MEASUREMENT_VALUE_HARMONIZED)
   - Fits a model: `lab_value ~ sex + age + (age | FINNGENID)` with random intercepts and slopes
   - Sex is coded according to the PLINK/REGENIE standard (1=Male, 2=Female, 0=Missing/Unknown)
   - If `include_sex = TRUE` (default), the function expects a SEX column in the drug_response object. If not found, it will raise an error with instructions to use `create_drug_response()` with appropriate covariates
@@ -205,9 +206,15 @@ To improve model convergence, the function standardizes both age and lab values:
 
 ```mermaid
 flowchart TD
-    A[drug_response object] --> B{Check SEX column}
+    A[Input Data] --> A1{Input Type?}
+    A1 -->|drug_response object| B{Check SEX column}
+    A1 -->|Lab measurements df| B2{Check required columns}
+
+    B2 -->|All present| B
+    B2 -->|Missing columns| D2[Error: Missing required columns]
+
     B -->|Present| C[Code SEX: 1=M, 2=F, 0=Missing]
-    B -->|Missing & include_sex=TRUE| D[Error: Add SEX via create_drug_response]
+    B -->|Missing & include_sex=TRUE| D[Error: Add SEX column]
     B -->|Missing & include_sex=FALSE| E[Set all SEX=1]
 
     C --> F[For each OMOP_CONCEPT_ID]
@@ -250,6 +257,7 @@ flowchart TD
     AB --> Z
 
     style D fill:#f96
+    style D2 fill:#f96
     style H fill:#fc6
     style Q fill:#fc6
     style S fill:#9f6
@@ -349,6 +357,32 @@ blup_results <- calculate_blup_slopes(response_data,
 # Summarize the BLUP results
 blup_summary <- summarize_blup_results(blup_results)
 print(blup_summary)
+
+# 8b. (NEW) Calculate BLUP slopes directly from lab measurements
+#     This allows BLUP analysis without drug response analysis
+# Option 1: Pull lab measurements with covariates using the new functionality
+lab_measurements <- get_lab_measurements(conn$labs,
+                                         lablist = c("3001308", "3027114"),  # LDL and HDL
+                                         require_values = TRUE,
+                                         covariates = conn$cov_pheno,
+                                         covariate_cols = c("SEX", "AGE_AT_DEATH_OR_END_OF_FOLLOWUP"))
+
+# Calculate BLUPs directly with SEX included
+blup_results_direct <- calculate_blup_slopes(lab_measurements,
+                                             output_dir = "blup_output_direct",
+                                             include_sex = TRUE,
+                                             calculate_qc = TRUE)
+
+# Option 2: If you don't need covariates, you can skip them
+lab_measurements_no_cov <- get_lab_measurements(conn$labs,
+                                                 lablist = c("3001308", "3027114"),
+                                                 require_values = TRUE)
+
+# Calculate BLUPs without sex adjustment
+blup_results_no_sex <- calculate_blup_slopes(lab_measurements_no_cov,
+                                              output_dir = "blup_output_direct",
+                                              include_sex = FALSE,  # Must be FALSE without SEX column
+                                              calculate_qc = TRUE)
 
 # 9. (Optional) Process variance files with quantile normalization
 #    This creates summary statistics and comparison plots

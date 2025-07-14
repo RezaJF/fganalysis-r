@@ -5,7 +5,7 @@
 \title{Calculate BLUP slopes for lab measurements over age}
 \usage{
 calculate_blup_slopes(
-  drug_response,
+  data,
   output_dir = ".",
   min_measurements = 2,
   include_sex = TRUE,
@@ -17,7 +17,8 @@ calculate_blup_slopes(
 )
 }
 \arguments{
-\item{drug_response}{A `drug.response` object containing lab measurements}
+\item{data}{Either a `drug.response` object or a data frame with lab measurements.
+If a data frame, it must contain columns: FINNGENID, OMOP_CONCEPT_ID, EVENT_AGE, and MEASUREMENT_VALUE_HARMONIZED}
 
 \item{output_dir}{Directory where output files will be saved. Defaults to current directory}
 

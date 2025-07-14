@@ -7,7 +7,8 @@ NULL
 #' @description Implements a linear mixed model (LMM) to calculate Best Linear Unbiased Predictors (BLUPs)
 #' for individual-specific slopes of lab value changes over age, following the methodology from
 #' Wiegrebe et al. (2024) Nature Communications.
-#' @param drug_response A `drug.response` object containing lab measurements
+#' @param data Either a `drug.response` object or a data frame with lab measurements.
+#' If a data frame, it must contain columns: FINNGENID, OMOP_CONCEPT_ID, EVENT_AGE, and MEASUREMENT_VALUE_HARMONIZED
 #' @param output_dir Directory where output files will be saved. Defaults to current directory
 #' @param min_measurements Minimum number of measurements per individual to include in analysis (default: 2)
 #' @param include_sex Logical indicating whether to include sex as a fixed effect in the model (default: TRUE).
@@ -34,7 +35,7 @@ NULL
 #'
 #' The output slopes are in original units (lab value change per year).
 #' @export
-calculate_blup_slopes <- function(drug_response, output_dir = ".",
+calculate_blup_slopes <- function(data, output_dir = ".",
                                   min_measurements = 2, include_sex = TRUE,
                                   debug_dir = NULL,
                                   drug_exposed_only = FALSE,
@@ -42,8 +43,20 @@ calculate_blup_slopes <- function(drug_response, output_dir = ".",
                                   calculate_qc = FALSE,
                                   normalize_variance = FALSE) {
 
-  if (!inherits(drug_response, "drug.reponse")) {
-    stop("Input must be a drug.reponse object.")
+  # Check input type and extract lab data accordingly
+  is_drug_response <- inherits(data, "drug.reponse")
+
+  if (!is_drug_response && !is.data.frame(data)) {
+    stop("Input must be either a drug.reponse object or a data frame with lab measurements.")
+  }
+
+  # Validate data frame input
+  if (!is_drug_response) {
+    required_cols <- c("FINNGENID", "OMOP_CONCEPT_ID", "EVENT_AGE", "MEASUREMENT_VALUE_HARMONIZED")
+    missing_cols <- setdiff(required_cols, colnames(data))
+    if (length(missing_cols) > 0) {
+      stop("Lab measurement data frame is missing required columns: ", paste(missing_cols, collapse = ", "))
+    }
   }
 
   # Check if lme4 is available
@@ -51,16 +64,44 @@ calculate_blup_slopes <- function(drug_response, output_dir = ".",
     stop("Package 'lme4' is required for this function. Please install it with: install.packages('lme4')")
   }
 
-  # Extract lab measurements
-  lab_data <- drug_response$all_measurements %>%
-    filter(!is.na(.data$MEASUREMENT_VALUE_HARMONIZED))
+  # Extract lab measurements based on input type
+  if (is_drug_response) {
+    lab_data <- data$all_measurements %>%
+      filter(!is.na(.data$MEASUREMENT_VALUE_HARMONIZED))
+
+    # Extract period definitions for variance calculation
+    after_period <- data$lab_response_period$after_period
+
+    # Extract drug purchases if needed
+    all_drug_purchases <- data$all_drug_purchases
+  } else {
+    # Direct lab measurement input
+    lab_data <- data %>%
+      filter(!is.na(.data$MEASUREMENT_VALUE_HARMONIZED))
+
+    # No period definitions available for direct lab input
+    after_period <- NULL
+    all_drug_purchases <- NULL
+
+    # Disable drug-specific features for direct lab input
+    if (drug_exposed_only || calculate_post_variance) {
+      warning("drug_exposed_only and calculate_post_variance are not supported with direct lab measurement input. These options will be ignored.")
+      drug_exposed_only <- FALSE
+      calculate_post_variance <- FALSE
+    }
+  }
 
   # Check for SEX column if include_sex is TRUE
   if (include_sex) {
     if (!"SEX" %in% colnames(lab_data)) {
-      stop("SEX column not found in drug_response object. ",
-           "Please run create_drug_response() with covariates = conn$cov_pheno ",
-           "and covariate_cols = c('SEX') to include sex data.")
+      if (is_drug_response) {
+        stop("SEX column not found in drug_response object. ",
+             "Please run create_drug_response() with covariates = conn$cov_pheno ",
+             "and covariate_cols = c('SEX') to include sex data.")
+      } else {
+        stop("SEX column not found in lab measurement data. ",
+             "Please add a SEX column to your data frame or set include_sex = FALSE.")
+      }
     }
 
     # Standardise sex coding to PLINK/REGENIE format (1=Male, 2=Female, 0=Missing)
@@ -77,6 +118,11 @@ calculate_blup_slopes <- function(drug_response, output_dir = ".",
 
   # Get unique OMOP concept IDs
   concept_ids <- unique(lab_data$OMOP_CONCEPT_ID)
+  analysis_groups <- data.frame(
+    concept_id = concept_ids,
+    atc_code = NA_character_,
+    stringsAsFactors = FALSE
+  )
 
   # Initialize results list
   blup_results <- list()

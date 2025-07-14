@@ -11,7 +11,9 @@ get_lab_measurements(
   return_cols = c("FINNGENID", "OMOP_CONCEPT_ID", "EVENT_AGE",
     "MEASUREMENT_VALUE_HARMONIZED"),
   finngen_ids = NULL,
-  lazy = FALSE
+  lazy = FALSE,
+  covariates = NULL,
+  covariate_cols = NULL
 )
 }
 \arguments{
@@ -26,6 +28,10 @@ get_lab_measurements(
 \item{finngen_ids}{vector of FINNGENIDs to filter the data}
 
 \item{lazy}{logical, if TRUE, return a lazy tbl object}
+
+\item{covariates}{Optional data frame with covariate data (e.g., sex, age at death)}
+
+\item{covariate_cols}{Optional character vector of column names to add from the covariates data frame}
 }
 \value{
 data frame with lab measurements

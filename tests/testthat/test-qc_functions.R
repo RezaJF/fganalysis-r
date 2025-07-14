@@ -104,3 +104,100 @@ test_that("QC correlation calculation works in calculate_blup_slopes", {
   # which is complex. In practice, this would be tested with real data
   # or a comprehensive mock object.
 })
+
+test_that("calculate_blup_slopes works with direct lab measurement input", {
+  # Create test lab measurement data
+  set.seed(123)
+  n_individuals <- 20
+  measurements_per_person <- 15
+
+  # Generate test data
+  test_lab_data <- expand.grid(
+    FINNGENID = paste0("ID", 1:n_individuals),
+    measurement = 1:measurements_per_person
+  )
+
+  # Add required columns
+  test_lab_data$OMOP_CONCEPT_ID <- "3001308"  # LDL cholesterol
+  test_lab_data$EVENT_AGE <- test_lab_data$measurement +
+    rep(runif(n_individuals, 40, 60), each = measurements_per_person)
+
+  # Create different slopes for different individuals
+  individual_slopes <- runif(n_individuals, -0.5, 0.5)
+  individual_intercepts <- runif(n_individuals, 2, 5)
+
+  test_lab_data$MEASUREMENT_VALUE_HARMONIZED <- NA
+  for (i in 1:n_individuals) {
+    idx <- test_lab_data$FINNGENID == paste0("ID", i)
+    test_lab_data$MEASUREMENT_VALUE_HARMONIZED[idx] <-
+      individual_intercepts[i] +
+      individual_slopes[i] * test_lab_data$EVENT_AGE[idx] +
+      rnorm(sum(idx), 0, 0.2)
+  }
+
+  # Add SEX column
+  test_lab_data$SEX <- rep(sample(c("M", "F"), n_individuals, replace = TRUE),
+                           each = measurements_per_person)
+
+  # Create temporary output directory
+  temp_dir <- tempdir()
+
+  # Test basic functionality without drug response
+  expect_no_error({
+    blup_results <- calculate_blup_slopes(
+      data = test_lab_data,
+      output_dir = temp_dir,
+      min_measurements = 5,
+      include_sex = TRUE,
+      calculate_qc = TRUE  # Test QC with direct input
+    )
+  })
+
+  # Check that results were created
+  expect_true(length(blup_results) > 0)
+  expect_true("3001308" %in% names(blup_results))
+
+    # Check output file exists
+  output_file <- file.path(temp_dir, "3001308_DF13.tsv")
+  expect_true(file.exists(output_file))
+
+  # Read and check output
+  output_data <- read.table(output_file, header = TRUE, sep = "\t")
+  expect_equal(nrow(output_data), n_individuals)
+  expect_true("X3001308_slope" %in% colnames(output_data))
+  expect_true("X3001308_fixed_slope" %in% colnames(output_data))  # QC was enabled
+
+  # Test without SEX column
+  test_lab_data_no_sex <- test_lab_data[, !colnames(test_lab_data) %in% "SEX"]
+
+  expect_no_error({
+    blup_results_no_sex <- calculate_blup_slopes(
+      data = test_lab_data_no_sex,
+      output_dir = temp_dir,
+      min_measurements = 5,
+      include_sex = FALSE  # Must set to FALSE when no SEX column
+    )
+  })
+
+  # Test error when SEX is required but missing
+  expect_error({
+    calculate_blup_slopes(
+      data = test_lab_data_no_sex,
+      output_dir = temp_dir,
+      include_sex = TRUE  # This should fail
+    )
+  }, "SEX column not found")
+
+  # Test warning for unsupported options
+  expect_warning({
+    calculate_blup_slopes(
+      data = test_lab_data,
+      output_dir = temp_dir,
+      drug_exposed_only = TRUE,  # Not supported with direct input
+      calculate_post_variance = TRUE  # Not supported with direct input
+    )
+  }, "not supported with direct lab measurement input")
+
+  # Clean up
+  unlink(list.files(temp_dir, pattern = "_DF13\\.tsv$", full.names = TRUE))
+})

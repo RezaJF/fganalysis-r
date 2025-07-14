@@ -5,13 +5,16 @@
 #' @param return_cols vector of column names to return
 #' @param finngen_ids vector of FINNGENIDs to filter the data
 #' @param lazy logical, if TRUE, return a lazy tbl object
+#' @param covariates Optional data frame with covariate data (e.g., sex, age at death)
+#' @param covariate_cols Optional character vector of column names to add from the covariates data frame
 #' @return data frame with lab measurements
 #' @export
-#' @importFrom dplyr %>% filter select collect
+#' @importFrom dplyr %>% filter select collect all_of left_join distinct
 #' @import stringr
 get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
                                  return_cols=c("FINNGENID","OMOP_CONCEPT_ID", "EVENT_AGE", "MEASUREMENT_VALUE_HARMONIZED"),
-                                 finngen_ids=NULL, lazy=FALSE) {
+                                 finngen_ids=NULL, lazy=FALSE,
+                                 covariates=NULL, covariate_cols=NULL) {
 
   return_cols <- unique(c("OMOP_CONCEPT_ID", return_cols))
 
@@ -22,6 +25,33 @@ get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
   }
   if (require_values) {
     labs <- labs %>% dplyr::filter(!is.na(.data$MEASUREMENT_VALUE_HARMONIZED))
+  }
+
+  # Add covariates if provided
+  if (!is.null(covariates) && !is.null(covariate_cols)) {
+    # Ensure FINNGENID is in the columns for the join
+    cols_to_select <- unique(c("FINNGENID", covariate_cols))
+
+    # Check that all requested columns exist in the covariates dataframe
+    missing_cols <- setdiff(cols_to_select, colnames(covariates))
+    if (length(missing_cols) > 0) {
+      stop(paste("The following `covariate_cols` are not in the `covariates` dataframe:",
+                 paste(missing_cols, collapse = ", ")))
+    }
+
+    # Select the requested columns and ensure one row per FINNGENID
+    cov_data_to_join <- covariates %>%
+      select(all_of(cols_to_select)) %>%
+      distinct(.data$FINNGENID, .keep_all = TRUE)
+
+    # If covariates is a lazy table (database connection), collect it
+    if (inherits(covariates, "tbl_lazy") || inherits(covariates, "tbl_sql")) {
+      cov_data_to_join <- dplyr::collect(cov_data_to_join)
+    }
+
+    # Join covariates with lab measurements
+    labs <- labs %>%
+      left_join(cov_data_to_join, by = "FINNGENID")
   }
 
   if (lazy) {
