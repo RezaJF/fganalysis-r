@@ -5,16 +5,16 @@
 \title{Get drug purchases from FinnGen data}
 \usage{
 get_drug_purchases(
-  all_phenos,
+  conn,
   druglist,
   finngen_ids = NULL,
-  return_cols = c("FINNGENID", "EVENT_AGE", ATC = "CODE1", REIMB_CODE = "CODE2", VNR =
-    "CODE3", N_PACKS = "CODE4"),
+  return_cols = c("FINNGENID", "EVENT_AGE", "APPROX_EVENT_DAY", ATC = "CODE1", REIMB_CODE
+    = "CODE2", VNR = "CODE3", N_PACKS = "CODE4"),
   lazy = FALSE
 )
 }
 \arguments{
-\item{all_phenos}{data frame with drug purchases}
+\item{conn}{finngen data connection object}
 
 \item{druglist}{vector of drug ATC codes. The ATC codes are matched with the first part of the code (e.g. A01*)}
 

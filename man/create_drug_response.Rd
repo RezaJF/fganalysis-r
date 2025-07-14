@@ -5,8 +5,7 @@
 \title{Create drug response object}
 \usage{
 create_drug_response(
-  kanta,
-  phenos,
+  conn,
   lablist,
   druglist,
   before_period,
@@ -15,9 +14,7 @@ create_drug_response(
 )
 }
 \arguments{
-\item{kanta}{data frame with lab measurements}
-
-\item{phenos}{data frame with drug purchases}
+\item{conn}{fg_data_connection object}
 
 \item{lablist}{vector of lab measurement concept IDs}
 

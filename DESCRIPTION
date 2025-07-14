@@ -16,7 +16,8 @@ Imports:
     stringr,
     ggpubr,
     rjson,
-    DBI
+    DBI,
+    data.table
 Suggests:
     testthat
 Encoding: UTF-8

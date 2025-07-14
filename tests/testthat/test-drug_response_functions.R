@@ -58,17 +58,20 @@ test_that("create_drug_response returns the correct structure", {
   phenos <- data.frame(
     FINNGENID = c("FG1", "FG2","FG3"),
     SOURCE = c("PURCH", "PURCH","PURCH"),
+    APPROX_EVENT_DAY = as.Date(c("2015-07-17" , "2015-07-18", "2015-07-19")),
     CODE1 = c("A01", "A02", "A02"),
     CODE2 = c("", "", ""),
     CODE3 = c("", "", ""),
     CODE4 = c("1", "1", "1"),
     EVENT_AGE = c(21.0, 20.0, 35)
   )
-                        
+
+  conn <-   fg_data_connection(list(pheno = phenos, labs = kanta))
+
   lablist <- c("lab1", "lab2")
   druglist <- c("A01", "A02")
   
-  result <- create_drug_response(kanta, phenos, lablist, druglist, c(-1, 0), c(0.1, 1))
+  result <- create_drug_response(conn, lablist, druglist, c(-1, 0), c(0.1, 1))
   
   expect_s3_class(result, "drug.reponse")
   expect_equal(nrow(result$response), 2)

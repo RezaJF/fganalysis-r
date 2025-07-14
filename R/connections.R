@@ -1,4 +1,5 @@
 #' @import DBI
+#' @import data.table
 #NULL
 get_bigquery_dbplyr <- function(projectid,dataset, table) {
    con <- dbConnect(
@@ -18,7 +19,6 @@ get_duckdb_dbplyr <- function(duckdb_file, table) {
   conn = dbConnect(duckdb::duckdb(duckdb_file), read_only=TRUE)
   return(tbl(conn, table))
 }
-
 
 fg_data_connection <- function(connections) {
     if (!is.list(connections)) {
@@ -55,14 +55,32 @@ call_connect <- function(conf) {
     typestring <- conf$type
 
     if (typestring == "parquet") {
-        return(duckdbfs::open_dataset(path, format="parquet"))
+        dat <- (duckdbfs::open_dataset(path, format="parquet"))
     } else if (typestring == "parquet-hive") {
-        return(duckdbfs::open_dataset(path, format="parquet", hive_style=TRUE))
+        dat <- (duckdbfs::open_dataset(path, format="parquet", hive_style=TRUE))
+    } else if (typestring == "tsv") 
+    {
+        dat <- fread(path, sep="\t") 
     } else {
-        stop("Unsupported connection type")
+        stop(paste("Unsupported connection type given in configuration file:", typestring,
+                   ". Supported types are: parquet, parquet-hive, tsv"))
     }
-}
 
+    if ("recodings" %in% names(conf)) {
+        for (recoding in conf$recodings) {
+            if (!("column" %in% names(recoding)) || !("function" %in% names(recoding))) {
+                stop("Recoding must contain 'column' and 'function' keys")
+            }
+
+            column <- recoding$column
+            function_name <- recoding[["function"]]
+            print(function_name)
+            
+            dat[[column]] <- do.call(function_name, list(dat[[column]]))
+        }
+    }
+    return(dat)
+}
 
 #' Connect to FinnGen data
 #' @param path_to_conf Path to the configuration file (JSON format)
