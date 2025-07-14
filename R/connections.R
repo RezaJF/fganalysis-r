@@ -1,5 +1,5 @@
 #' @import DBI
-#' @import data.table
+#' @importFrom data.table fread
 #NULL
 get_bigquery_dbplyr <- function(projectid,dataset, table) {
    con <- dbConnect(
