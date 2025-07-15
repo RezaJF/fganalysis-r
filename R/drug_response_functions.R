@@ -23,8 +23,7 @@ drug.response <- function(responses, lab_measurements, drug_purchases, before_pe
 }
 
 #' @title Create drug response object
-#' @param kanta data frame with lab measurements
-#' @param phenos data frame with drug purchases
+#' @param conn fg_data_connection object
 #' @param lablist vector of lab measurement concept IDs
 #' @param druglist vector of drug ATC codes. The ATC codes are matched with the first part of the code (e.g. A01*). 
 #' @param before_period vector with two elements, start and end of the before period
@@ -32,14 +31,19 @@ drug.response <- function(responses, lab_measurements, drug_purchases, before_pe
 #' @param finngen_ids vector of FINNGENIDs to filter the data
 #' @return drug.response object
 #' @export
-create_drug_response <- function(kanta, phenos, lablist, druglist, 
+create_drug_response <- function(conn, lablist, druglist, 
 before_period, after_period, finngen_ids=NULL) {
+
+  if(!inherits(conn, "fg_data_connection")) {
+    stop("conn must be a fg_data_connection object")
+  }
+
   print("Querying lab measurements...")
-  lab_measurements <- get_lab_measurements(all_labs=kanta, lablist=lablist, finngen_ids=finngen_ids, require_values = TRUE)
+  lab_measurements <- get_lab_measurements(all_labs=conn$labs, lablist=lablist, finngen_ids=finngen_ids, require_values = TRUE)
   
   all_fg_ids <- unique(c(lab_measurements$FINNGENID, finngen_ids))
   print("Querying purchases...")
-  drug_purchases <- get_drug_purchases(phenos, druglist, all_fg_ids)
+  drug_purchases <- get_drug_purchases(conn, druglist, all_fg_ids)
   
   dr_first_purchase <- drug_purchases %>% group_by(.data$FINNGENID) %>% arrange(.data$EVENT_AGE) %>%
     summarize(n = n(), first_drug_age = first(.data$EVENT_AGE), first_drug=first(.data$ATC))
@@ -209,27 +213,44 @@ get_lab_measurements <- function(all_labs, lablist, require_values=TRUE, return_
 
 
 #' @title Get drug purchases from FinnGen data
-#' @param all_phenos data frame with drug purchases
+#' @param conn finngen data connection object
 #' @param druglist vector of drug ATC codes. The ATC codes are matched with the first part of the code (e.g. A01*)
 #' @param finngen_ids vector of FINNGENIDs to filter the data. leave empty to get all
 #' @param return_cols vector of column names to return
 #' @param lazy logical, if TRUE, return a lazy tbl object
 #' @return data frame with drug purchases
 #' @export
-get_drug_purchases <- function(all_phenos, druglist, finngen_ids=NULL, 
-                               return_cols=c("FINNGENID","EVENT_AGE", ATC="CODE1", REIMB_CODE="CODE2", VNR="CODE3", N_PACKS="CODE4"),
+get_drug_purchases <- function(conn, druglist, finngen_ids=NULL, 
+                               return_cols=c("FINNGENID","EVENT_AGE","APPROX_EVENT_DAY", ATC="CODE1", REIMB_CODE="CODE2", VNR="CODE3", N_PACKS="CODE4"),
                                lazy=FALSE) {
   
+  ## check that conn is a fg_data_connection object and has pheno data name
+  if (!inherits(conn, "fg_data_connection")) {
+    stop("conn must be a fg_data_connection object")
+  }
+
+  if (!"pheno" %in% names(conn)) {
+    stop("conn must contain 'pheno' data")
+  }
+
   drugs_regex <- paste0("^(",
                         paste0(druglist, collapse = '|'),
                       ")")
   
+  all_phenos <- conn$pheno 
+
   drugs <- all_phenos %>% dplyr::filter(.data$SOURCE=="PURCH" & str_detect(.data$CODE1, drugs_regex)) %>% select(all_of(return_cols))
   
   if (!is.null(finngen_ids)) {
     drugs <- drugs %>% dplyr::filter(.data$FINNGENID %in% finngen_ids)
   }
   
+  if ("vnr" %in% names(conn)) {
+    columns <- c("VNR","Substance","MedicineName","PackageSize","DDDPerPack","Dosage","DosageUnit")
+    vnr <- conn$vnr %>% select(all_of(columns))
+    drugs <- left_join(drugs, vnr, by="VNR", copy=TRUE)
+  }  
+
   ifelse(lazy, return(drugs), return(dplyr::collect(drugs)))
 }
 
