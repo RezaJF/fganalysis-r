@@ -24,22 +24,62 @@ drug.response <- function(responses, lab_measurements,
 }
 
 #' @title Create drug response object
-#' @param kanta data frame with lab measurements
-#' @param phenos data frame with drug purchases
-#' @param lablist vector of lab measurement concept IDs
-#' @param druglist vector of drug ATC codes. The ATC codes are matched with the first part of the code (e.g. A01*).
-#' @param before_period vector with two elements, start and end of the before period
-#' @param after_period vector with two elements, start and end of the after period
-#' @param finngen_ids vector of FINNGENIDs to filter the data
-#' @param remove_outliers_sd integer, if defined, remove outliers from the lab measurements. The value is the number of standard deviations from the mean to define an outlier (i.e. 1, 2, 3, 4, 5, 6)
-#' @param covariates Optional data frame with covariate data (e.g., sex, age at death)
-#' @param covariate_cols Optional character vector of column names to add from the covariates data frame
+#' @param conn Connection object or kanta data frame (for legacy support)
+#' @param lablist Lab list or phenos data frame (for legacy support)
+#' @param druglist Drug list
+#' @param before_period Before period
+#' @param after_period After period
+#' @param finngen_ids Finngen IDs
+#' @param remove_outliers_sd Remove outliers SD
+#' @param covariates Covariates data frame
+#' @param covariate_cols Covariate columns
+#' @param all_labs Direct labs data frame (alternative input)
+#' @param all_phenos Direct phenos data frame (alternative input)
+#' @param kanta Legacy parameter name for labs data
+#' @param phenos Legacy parameter name for phenos data
 #' @return drug.response object
 #' @export
-create_drug_response <- function(kanta, phenos, lablist, druglist,
-                                 before_period, after_period, finngen_ids = NULL, remove_outliers_sd = NULL,
+create_drug_response <- function(conn = NULL, lablist = NULL, druglist = NULL,
+                                 before_period = NULL, after_period = NULL,
+                                 finngen_ids = NULL, remove_outliers_sd = NULL,
                                  covariates = NULL,
-                                 covariate_cols = NULL) {
+                                 covariate_cols = NULL,
+                                 # Alternative input parameters
+                                 all_labs = NULL, all_phenos = NULL,
+                                 # Legacy parameters
+                                 kanta = NULL, phenos = NULL) {
+
+  # Handle different input types
+  if (!is.null(kanta) && !is.null(phenos)) {
+    # Legacy API: kanta and phenos provided directly
+    kanta <- kanta
+    phenos <- phenos
+    # Other parameters should already be in correct positions
+  } else if (inherits(conn, "fg_data_connection")) {
+    # Extract from connection object
+    kanta <- conn$labs
+    phenos <- conn$pheno
+  } else if (!is.null(all_labs) && !is.null(all_phenos)) {
+    # Direct data frame input (for testing)
+    kanta <- all_labs
+    phenos <- all_phenos
+  } else if (!is.null(conn) && is.data.frame(conn)) {
+    # Legacy positional API - conn is kanta, lablist is phenos
+    kanta <- conn
+    phenos <- lablist
+    # Shift other parameters
+    lablist <- druglist
+    druglist <- before_period
+    before_period <- after_period
+    after_period <- finngen_ids
+    finngen_ids <- remove_outliers_sd
+    remove_outliers_sd <- covariates
+    covariates <- covariate_cols
+    covariate_cols <- NULL
+  } else {
+    stop("Must provide either: 1) conn object, 2) kanta and phenos, or 3) all_labs and all_phenos")
+  }
+
   print("Querying lab measurements...")
   lab_measurements <- get_lab_measurements(all_labs=kanta, lablist=lablist, finngen_ids=finngen_ids, require_values = TRUE)
 

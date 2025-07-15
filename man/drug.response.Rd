@@ -19,9 +19,9 @@ drug.response(
 
 \item{drug_purchases}{data frame with all drug purchases}
 
-\item{before_period}{vector with two elements, start and end of the before period}
+\item{before_period}{vector with two elements, start and end of the before period # nolint: line_length_linter.}
 
-\item{after_period}{vector with two elements, start and end of the after period}
+\item{after_period}{vector with two elements, start and end of the after period # nolint: line_length_linter.}
 }
 \value{
 object of class drug.response

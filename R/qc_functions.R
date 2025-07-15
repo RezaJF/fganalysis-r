@@ -60,16 +60,18 @@ calculate_fixed_slopes <- function(data, min_measurements = 2) {
 
 #' @title Process Variance Files with Quantile Normalization
 #' @description Reads variance files, adds quantile normalized column, and generates summary
-#' @param output_dir Directory containing variance files
+#' @param output_dir Directory containing variance files (default: current directory)
+#' @param pattern Regular expression pattern to match variance files (default: "_variance\\.tsv$")
 #' @param generate_plots Logical, whether to generate comparison plots (default: FALSE)
 #' @param save_normalized Logical, whether to save files with normalized column (default: TRUE)
 #' @return Summary data frame with statistics for original and normalized values
 #' @export
-process_variance_files <- function(output_dir = ".", generate_plots = FALSE,
+process_variance_files <- function(output_dir = ".", pattern = "_variance\\.tsv$",
+                                   generate_plots = FALSE,
                                    save_normalized = TRUE) {
 
   # List all *_variance.tsv files
-  variance_files <- list.files(path = output_dir, pattern = "_variance\\.tsv$",
+  variance_files <- list.files(path = output_dir, pattern = pattern,
                                full.names = TRUE)
 
   if (length(variance_files) == 0) {
@@ -88,11 +90,28 @@ process_variance_files <- function(output_dir = ".", generate_plots = FALSE,
     df <- read.table(file_path, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
 
     # Infer the variance column name
-    variance_col <- sub("\\.tsv$", "", file_name)
+    base_name <- sub("\\.tsv$", "", file_name)
+
+    # Look for the column - it might have an X prefix if it starts with a number
+    variance_col <- NULL
+    if (base_name %in% colnames(df)) {
+      variance_col <- base_name
+    } else if (paste0("X", base_name) %in% colnames(df)) {
+      variance_col <- paste0("X", base_name)
+    } else {
+      # Try to find any column ending with _variance
+      variance_cols <- grep("_variance$", colnames(df), value = TRUE)
+      if (length(variance_cols) > 0) {
+        variance_col <- variance_cols[1]
+        if (length(variance_cols) > 1) {
+          warning(sprintf("Multiple variance columns found in %s, using %s", file_name, variance_col))
+        }
+      }
+    }
 
     # Check if the column exists
-    if (!variance_col %in% colnames(df)) {
-      warning(sprintf("Column %s not found in %s", variance_col, file_name))
+    if (is.null(variance_col) || !variance_col %in% colnames(df)) {
+      warning(sprintf("No variance column found in %s", file_name))
       next
     }
 

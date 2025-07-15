@@ -6,12 +6,15 @@
 \usage{
 process_variance_files(
   output_dir = ".",
+  pattern = "_variance\\\\.tsv$",
   generate_plots = FALSE,
   save_normalized = TRUE
 )
 }
 \arguments{
-\item{output_dir}{Directory containing variance files}
+\item{output_dir}{Directory containing variance files (default: current directory)}
+
+\item{pattern}{Regular expression pattern to match variance files (default: "_variance\\.tsv$")}
 
 \item{generate_plots}{Logical, whether to generate comparison plots (default: FALSE)}
 

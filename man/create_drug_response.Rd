@@ -5,35 +5,47 @@
 \title{Create drug response object}
 \usage{
 create_drug_response(
-  conn,
-  lablist,
-  druglist,
-  before_period,
-  after_period,
+  conn = NULL,
+  lablist = NULL,
+  druglist = NULL,
+  before_period = NULL,
+  after_period = NULL,
   finngen_ids = NULL,
   remove_outliers_sd = NULL,
-  covariate_df = NULL,
-  covariate_names = NULL
+  covariates = NULL,
+  covariate_cols = NULL,
+  all_labs = NULL,
+  all_phenos = NULL,
+  kanta = NULL,
+  phenos = NULL
 )
 }
 \arguments{
-\item{conn}{fg_data_connection object}
+\item{conn}{Connection object or kanta data frame (for legacy support)}
 
-\item{lablist}{vector of lab measurement concept IDs}
+\item{lablist}{Lab list or phenos data frame (for legacy support)}
 
-\item{druglist}{vector of drug ATC codes. The ATC codes are matched with the first part of the code (e.g. A01*).}
+\item{druglist}{Drug list}
 
-\item{before_period}{vector with two elements, start and end of the before period}
+\item{before_period}{Before period}
 
-\item{after_period}{vector with two elements, start and end of the after period}
+\item{after_period}{After period}
 
-\item{finngen_ids}{vector of FINNGENIDs to filter the data}
+\item{finngen_ids}{Finngen IDs}
 
-\item{remove_outliers_sd}{integer, if defined, remove outliers from the lab measurements. The value is the number of standard deviations from the mean to define an outlier (i.e. 1, 2, 3, 4, 5, 6)}
+\item{remove_outliers_sd}{Remove outliers SD}
 
-\item{covariate_df}{Optional data frame with covariate data (e.g., sex, age at death)}
+\item{covariates}{Covariates data frame}
 
-\item{covariate_names}{Optional character vector of column names to add from the covariates data frame}
+\item{covariate_cols}{Covariate columns}
+
+\item{all_labs}{Direct labs data frame (alternative input)}
+
+\item{all_phenos}{Direct phenos data frame (alternative input)}
+
+\item{kanta}{Legacy parameter name for labs data}
+
+\item{phenos}{Legacy parameter name for phenos data}
 }
 \value{
 drug.response object
