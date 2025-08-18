@@ -123,8 +123,10 @@ summarize_drug_response <- function(drug_response, out_file_prefix) {
 
 
 #' @title Plot Distribution of Lab Values Before and After Drug Use
-#' @description Creates a boxplot comparing the distribution of lab values
+#' @description Creates a violin plot comparing the distribution of lab values
 #' before and after the first drug purchase, faceted by drug type.
+#' The plot uses consistent ordering with "Before" always on the left (teal)
+#' and "After" always on the right (gold).
 #' @param drug_response A `drug.response` object.
 #' @param remove_outliers A logical indicating whether to remove outliers
 #' using the 1.5 * IQR rule. Defaults to `FALSE`.
@@ -168,23 +170,26 @@ plot_lab_value_distribution <- function(drug_response, remove_outliers = FALSE) 
   plot_data <- plot_data %>%
     mutate(period = factor(.data$period, levels = c("Before", "After")))
 
-  # Generate plot with ggpubr color palette
-  p <- ggplot(plot_data,
-              aes(x = .data$period, y = .data$MEASUREMENT_VALUE_HARMONIZED,
-                  fill = .data$period)) +
-    ggplot2::geom_boxplot(outlier.shape = if (remove_outliers) NA else 19) +
+  # Generate violin plot with ggpubr
+  p <- ggpubr::ggviolin(plot_data,
+                        x = "period", y = "MEASUREMENT_VALUE_HARMONIZED",
+                        fill = "period",
+                        palette = c("#00AFBB", "#E7B800"),
+                        add = "boxplot",
+                        add.params = list(fill = "white")) +
     ggpubr::stat_compare_means(method = "t.test",
-                               label = "p.format", paired = FALSE,
-                               label.x = 1.5, label.y.npc = 0.9) +
-    ggplot2::scale_fill_manual(values = c("#00AFBB", "#E7B800"),
-                              name = "Period") +
+                               label = "p.signif",
+                               label.x = 1.5) +
+    ggpubr::stat_compare_means(method = "t.test",
+                               label.y.npc = 0.9) +
     labs(
       title = "Distribution of Lab Values Before and After First Drug Purchase",
       x = "Period Relative to Drug Purchase",
       y = "Harmonised Measurement Value"
     ) +
     theme_minimal() +
-    facet_wrap(~.data$first_drug, scales = "free_y")
+    facet_wrap(~.data$first_drug, scales = "free_y") +
+    theme(legend.position = "bottom")
 
   return(p)
 }
