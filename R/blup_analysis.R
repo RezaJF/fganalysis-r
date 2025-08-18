@@ -19,6 +19,8 @@ NULL
 #' @param calculate_post_variance Logical indicating whether to calculate variance of lab values in the post-drug period (default: FALSE).
 #' @param calculate_qc Logical indicating whether to calculate quality control metrics including correlation between fixed-effect and BLUP slopes (default: FALSE).
 #' @param normalize_variance Logical indicating whether to add quantile normalized variance to output files (default: FALSE).
+#' @param save_model Logical indicating whether to save the fitted lmer model object as an RDS file for each OMOP concept (default: FALSE).
+#' @param plot_blup_correlation Logical indicating whether to create a scatter plot comparing BLUP slopes with fixed-effect slopes, including correlation coefficient and p-value (default: FALSE). Requires ggpubr package.
 #' @return A list containing BLUP results for each OMOP_CONCEPT_ID
 #' @details The model fitted is:
 #' lab_value_i,t = β0 + β1*sex_i + β2*age_i,t + γ0i + γ1i*age_i,t + ε_i,t
@@ -41,7 +43,9 @@ calculate_blup_slopes <- function(data, output_dir = ".",
                                   drug_exposed_only = FALSE,
                                   calculate_post_variance = FALSE,
                                   calculate_qc = FALSE,
-                                  normalize_variance = FALSE) {
+                                  normalize_variance = FALSE,
+                                  save_model = FALSE,
+                                  plot_blup_correlation = FALSE) {
 
   # Check input type and extract lab data accordingly
   is_drug_response <- inherits(data, "drug.reponse")
@@ -62,6 +66,11 @@ calculate_blup_slopes <- function(data, output_dir = ".",
   # Check if lme4 is available
   if (!requireNamespace("lme4", quietly = TRUE)) {
     stop("Package 'lme4' is required for this function. Please install it with: install.packages('lme4')")
+  }
+
+  # Check if ggpubr is available when plotting is requested
+  if (plot_blup_correlation && !requireNamespace("ggpubr", quietly = TRUE)) {
+    stop("Package 'ggpubr' is required for plot_blup_correlation = TRUE. Please install it with: install.packages('ggpubr')")
   }
 
   # Extract lab measurements based on input type
@@ -310,12 +319,91 @@ calculate_blup_slopes <- function(data, output_dir = ".",
 
       cat(paste0("Saved results to: ", output_file, "\n"))
 
+      # Save model if requested
+      model_file <- NULL
+      if (save_model) {
+        model_file <- file.path(output_dir, paste0(concept_id, "_model.rds"))
+        saveRDS(lmm_model, file = model_file)
+        cat(paste0("Saved model to: ", model_file, "\n"))
+      }
+
+      # Create BLUP vs fixed-effect correlation plot if requested
+      plot_file <- NULL
+      blup_fixed_correlation <- NULL
+      if (plot_blup_correlation || calculate_qc) {
+        # Calculate fixed-effect slopes for comparison
+        fixed_effect_slopes <- analysis_data %>%
+          group_by(.data$FINNGENID) %>%
+          do({
+            df <- .
+            tryCatch({
+              if (include_sex && nrow(df) >= 3) {
+                lm_fit <- lm(MEASUREMENT_VALUE_HARMONIZED ~ EVENT_AGE + SEX_CODED, data = df)
+              } else if (nrow(df) >= 3) {
+                lm_fit <- lm(MEASUREMENT_VALUE_HARMONIZED ~ EVENT_AGE, data = df)
+              } else {
+                return(data.frame(fixed_slope = NA_real_))
+              }
+
+              if (length(coef(lm_fit)) >= 2 && !is.na(coef(lm_fit)[2])) {
+                data.frame(fixed_slope = coef(lm_fit)[2])  # Age coefficient
+              } else {
+                data.frame(fixed_slope = NA_real_)
+              }
+            }, error = function(e) {
+              data.frame(fixed_slope = NA_real_)
+            })
+          }) %>%
+          ungroup() %>%
+          filter(!is.na(.data$fixed_slope))
+
+        # Merge BLUP and fixed-effect slopes
+        comparison_data <- blup_slopes %>%
+          left_join(fixed_effect_slopes, by = "FINNGENID") %>%
+          filter(!is.na(.data$slope) & !is.na(.data$fixed_slope))
+
+        if (nrow(comparison_data) > 3) {
+          # Calculate correlation
+          cor_test <- cor.test(comparison_data$slope, comparison_data$fixed_slope)
+          blup_fixed_correlation <- list(
+            correlation = cor_test$estimate,
+            p_value = cor_test$p.value,
+            n_pairs = nrow(comparison_data)
+          )
+
+          # Create plot if requested
+          if (plot_blup_correlation) {
+            library(ggpubr)
+            p <- ggpubr::ggscatter(comparison_data,
+                                   x = "fixed_slope", y = "slope",
+                                   add = "reg.line", conf.int = TRUE,
+                                   cor.coef = TRUE, cor.method = "pearson",
+                                   xlab = "Fixed-Effect Slope (OLS)",
+                                   ylab = "BLUP Slope",
+                                   title = paste0("BLUP vs Fixed-Effect Slopes: ", concept_id),
+                                   subtitle = paste0("n = ", nrow(comparison_data),
+                                                   ", r = ", round(cor_test$estimate, 3),
+                                                   ", p = ", format.pval(cor_test$p.value, digits = 3))) +
+              ggplot2::theme_bw()
+
+            plot_file <- file.path(output_dir, paste0(concept_id, "_blup_correlation.pdf"))
+            ggplot2::ggsave(plot_file, plot = p, width = 8, height = 6)
+            cat(paste0("Saved correlation plot to: ", plot_file, "\n"))
+          }
+        } else {
+          warning(paste0("Insufficient data for correlation analysis for OMOP_CONCEPT_ID: ", concept_id))
+        }
+      }
+
       # Store results
       blup_results[[as.character(concept_id)]] <- list(
         model = lmm_model,
         blup_slopes = blup_slopes,
         n_individuals = n_individuals,
-        output_file = output_file
+        output_file = output_file,
+        model_file = model_file,
+        plot_file = plot_file,
+        blup_fixed_correlation = blup_fixed_correlation
       )
 
     }, error = function(e) {

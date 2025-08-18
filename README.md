@@ -178,7 +178,7 @@ This package provides a suite of functions for drug response analysis.
 - **`plot_lab_value_distribution(drug_response, remove_outliers = FALSE)`**: Creates and returns a `ggplot` object containing boxplots that compare the distribution of lab values before and after the first drug purchase. The plot is faceted by drug type and includes a t-test p-value to compare the distributions in each facet.
 
 ### BLUP Analysis (Linear Mixed Models)
-- **`calculate_blup_slopes(data, output_dir = ".", min_measurements = 2, include_sex = TRUE, calculate_qc = FALSE, normalize_variance = FALSE)`**: Implements a linear mixed model (LMM) to calculate Best Linear Unbiased Predictors (BLUPs) for individual-specific slopes of lab value changes over age. This follows the methodology from [Wiegrebe et al. (2024) Nature Communications](https://www.nature.com/articles/s41467-024-54483-9). The function:
+- **`calculate_blup_slopes(data, output_dir = ".", min_measurements = 2, include_sex = TRUE, calculate_qc = FALSE, normalize_variance = FALSE, save_model = FALSE, plot_blup_correlation = FALSE)`**: Implements a linear mixed model (LMM) to calculate Best Linear Unbiased Predictors (BLUPs) for individual-specific slopes of lab value changes over age. This follows the methodology from [Wiegrebe et al. (2024) Nature Communications](https://www.nature.com/articles/s41467-024-54483-9). The function:
   - **NEW**: Accepts either a `drug.response` object OR a data frame with lab measurements (must contain: FINNGENID, OMOP_CONCEPT_ID, EVENT_AGE, MEASUREMENT_VALUE_HARMONIZED)
   - Fits a model: `lab_value ~ sex + age + (age | FINNGENID)` with random intercepts and slopes
   - Sex is coded according to the PLINK/REGENIE standard (1=Male, 2=Female, 0=Missing/Unknown)
@@ -190,6 +190,10 @@ This package provides a suite of functions for drug response analysis.
     - When `calculate_qc = TRUE`: Calculates fixed-effect slopes for comparison with BLUPs and reports correlation
     - When `normalize_variance = TRUE`: Adds quantile-normalized variance column to variance output files
     - QC correlation helps validate that random effects are capturing individual variation appropriately
+  - **NEW: Model Saving and Visualization**:
+    - When `save_model = TRUE`: Saves the fitted lmer model object as an RDS file (`{OMOP_CONCEPT_ID}_model.rds`)
+    - When `plot_blup_correlation = TRUE`: Creates a scatter plot comparing BLUP slopes with fixed-effect slopes, including correlation coefficient, p-value, and regression line with confidence interval (requires `ggpubr` package)
+    - Plot uses `theme_bw()` and is saved as `{OMOP_CONCEPT_ID}_blup_correlation.pdf`
   - Returns a list with model details and BLUP estimates for each lab measurement type
 
 #### Scaling and Back-transformation Note
@@ -352,11 +356,38 @@ ggsave("statin_ldl_distribution.pdf", plot = lab_distribution_plot, width = 10, 
 blup_results <- calculate_blup_slopes(response_data,
                                       output_dir = "blup_output",
                                       calculate_qc = TRUE,  # NEW: Calculate QC metrics
-                                      normalize_variance = TRUE)  # NEW: Add qnorm to variance files
+                                      normalize_variance = TRUE,  # NEW: Add qnorm to variance files
+                                      save_model = TRUE,  # NEW: Save fitted lmer models
+                                      plot_blup_correlation = TRUE)  # NEW: Create BLUP vs OLS correlation plots
 
 # Summarize the BLUP results
 blup_summary <- summarize_blup_results(blup_results)
 print(blup_summary)
+
+# NEW: Access saved models and correlation information
+for (concept_id in names(blup_results)) {
+  result <- blup_results[[concept_id]]
+
+  # Check if model was saved
+  if (!is.null(result$model_file)) {
+    cat("Model saved to:", result$model_file, "\n")
+    # Load the model if needed
+    # saved_model <- readRDS(result$model_file)
+  }
+
+  # Check if correlation plot was created
+  if (!is.null(result$plot_file)) {
+    cat("Correlation plot saved to:", result$plot_file, "\n")
+  }
+
+  # Access correlation statistics
+  if (!is.null(result$blup_fixed_correlation)) {
+    cat("BLUP-OLS correlation for", concept_id, ":\n")
+    cat("  r =", round(result$blup_fixed_correlation$correlation, 3), "\n")
+    cat("  p =", format.pval(result$blup_fixed_correlation$p_value), "\n")
+    cat("  n =", result$blup_fixed_correlation$n_pairs, "pairs\n")
+  }
+}
 
 # 8b. (NEW) Calculate BLUP slopes directly from lab measurements
 #     This allows BLUP analysis without drug response analysis
@@ -367,11 +398,13 @@ lab_measurements <- get_lab_measurements(conn$labs,
                                          covariates = conn$cov_pheno,
                                          covariate_cols = c("SEX", "AGE_AT_DEATH_OR_END_OF_FOLLOWUP"))
 
-# Calculate BLUPs directly with SEX included
+# Calculate BLUPs directly with SEX included and new features
 blup_results_direct <- calculate_blup_slopes(lab_measurements,
                                              output_dir = "blup_output_direct",
                                              include_sex = TRUE,
-                                             calculate_qc = TRUE)
+                                             calculate_qc = TRUE,
+                                             save_model = TRUE,
+                                             plot_blup_correlation = TRUE)
 
 # Option 2: If you don't need covariates, you can skip them
 lab_measurements_no_cov <- get_lab_measurements(conn$labs,
