@@ -128,7 +128,7 @@ summarize_drug_response <- function(drug_response, out_file_prefix) {
 #' @param drug_response A `drug.response` object.
 #' @param remove_outliers A logical indicating whether to remove outliers
 #' using the 1.5 * IQR rule. Defaults to `FALSE`.
-#' @return A `ggplot` object.
+#' @return A `ggplot` object with consistent ordering and ggpubr color palette.
 #' @export
 plot_lab_value_distribution <- function(drug_response, remove_outliers = FALSE) {
   if (!inherits(drug_response, "drug.reponse")) {
@@ -164,7 +164,11 @@ plot_lab_value_distribution <- function(drug_response, remove_outliers = FALSE) 
       ungroup()
   }
 
-  # Generate plot
+  # Ensure consistent ordering: Before on left, After on right
+  plot_data <- plot_data %>%
+    mutate(period = factor(.data$period, levels = c("Before", "After")))
+
+  # Generate plot with ggpubr color palette
   p <- ggplot(plot_data,
               aes(x = .data$period, y = .data$MEASUREMENT_VALUE_HARMONIZED,
                   fill = .data$period)) +
@@ -172,6 +176,8 @@ plot_lab_value_distribution <- function(drug_response, remove_outliers = FALSE) 
     ggpubr::stat_compare_means(method = "t.test",
                                label = "p.format", paired = FALSE,
                                label.x = 1.5, label.y.npc = 0.9) +
+    ggplot2::scale_fill_manual(values = c("#00AFBB", "#E7B800"),
+                              name = "Period") +
     labs(
       title = "Distribution of Lab Values Before and After First Drug Purchase",
       x = "Period Relative to Drug Purchase",
