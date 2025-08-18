@@ -21,8 +21,8 @@ get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
   # Ensure robust matching regardless of column/vector types (character vs numeric)
   # Convert lablist to character to match against OMOP_CONCEPT_ID which may be stored as either type
   lablist_chr <- as.character(lablist)
-  
-  labs <- all_labs %>% 
+
+  labs <- all_labs %>%
     select(all_of(return_cols)) %>%
     mutate(OMOP_CONCEPT_ID = as.character(.data$OMOP_CONCEPT_ID)) %>%
     dplyr::filter(.data$OMOP_CONCEPT_ID %in% lablist_chr)
