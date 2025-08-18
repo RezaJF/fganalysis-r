@@ -16,15 +16,19 @@ get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
                                  finngen_ids=NULL, lazy=FALSE,
                                  covariates=NULL, covariate_cols=NULL) {
 
-  return_cols <- unique(c("OMOP_CONCEPT_ID", return_cols))
+    return_cols <- unique(c("OMOP_CONCEPT_ID", return_cols))
 
   # Ensure robust matching regardless of column/vector types (character vs numeric)
-  # Convert lablist to character to match against OMOP_CONCEPT_ID which may be stored as either type
+  # The OMOP_CONCEPT_ID column may be stored as DECIMAL in the parquet file
+  # We need to cast it to character BEFORE filtering to avoid type conversion errors
+  # Convert lablist to character for consistent comparison
   lablist_chr <- as.character(lablist)
-
-  labs <- all_labs %>%
-    select(all_of(return_cols)) %>%
+  
+  # Cast OMOP_CONCEPT_ID to character in the database query before filtering
+  # This ensures the comparison works regardless of the storage type
+  labs <- all_labs %>% 
     mutate(OMOP_CONCEPT_ID = as.character(.data$OMOP_CONCEPT_ID)) %>%
+    select(all_of(return_cols)) %>%
     dplyr::filter(.data$OMOP_CONCEPT_ID %in% lablist_chr)
 
   if (!is.null(finngen_ids)) {
