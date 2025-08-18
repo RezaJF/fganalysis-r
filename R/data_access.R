@@ -9,7 +9,7 @@
 #' @param covariate_cols Optional character vector of column names to add from the covariates data frame
 #' @return data frame with lab measurements
 #' @export
-#' @importFrom dplyr %>% filter select collect all_of left_join distinct
+#' @importFrom dplyr %>% filter select collect all_of left_join distinct mutate
 #' @import stringr
 get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
                                  return_cols=c("FINNGENID","OMOP_CONCEPT_ID", "EVENT_AGE", "MEASUREMENT_VALUE_HARMONIZED"),
@@ -18,7 +18,14 @@ get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
 
   return_cols <- unique(c("OMOP_CONCEPT_ID", return_cols))
 
-  labs <- all_labs %>% select(all_of(return_cols)) %>% dplyr::filter(.data$OMOP_CONCEPT_ID %in% lablist)
+  # Ensure robust matching regardless of column/vector types (character vs numeric)
+  # Convert lablist to character to match against OMOP_CONCEPT_ID which may be stored as either type
+  lablist_chr <- as.character(lablist)
+  
+  labs <- all_labs %>% 
+    select(all_of(return_cols)) %>%
+    mutate(OMOP_CONCEPT_ID = as.character(.data$OMOP_CONCEPT_ID)) %>%
+    dplyr::filter(.data$OMOP_CONCEPT_ID %in% lablist_chr)
 
   if (!is.null(finngen_ids)) {
     labs <- labs %>% dplyr::filter(.data$FINNGENID %in% finngen_ids)
