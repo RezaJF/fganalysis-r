@@ -23,10 +23,10 @@ get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
   # We need to cast it to character BEFORE filtering to avoid type conversion errors
   # Convert lablist to character for consistent comparison
   lablist_chr <- as.character(lablist)
-  
+
   # Cast OMOP_CONCEPT_ID to character in the database query before filtering
   # This ensures the comparison works regardless of the storage type
-  labs <- all_labs %>% 
+  labs <- all_labs %>%
     mutate(OMOP_CONCEPT_ID = as.character(.data$OMOP_CONCEPT_ID)) %>%
     select(all_of(return_cols)) %>%
     dplyr::filter(.data$OMOP_CONCEPT_ID %in% lablist_chr)
