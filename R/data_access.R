@@ -44,14 +44,11 @@ get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
       select(all_of(cols_to_select)) %>%
       distinct(.data$FINNGENID, .keep_all = TRUE)
 
-    # If covariates is a lazy table (database connection), collect it
-    if (inherits(covariates, "tbl_lazy") || inherits(covariates, "tbl_sql")) {
-      cov_data_to_join <- dplyr::collect(cov_data_to_join)
-    }
-
     # Join covariates with lab measurements
+    # If labs is a lazy table (e.g., DuckDB), allow copying the RHS to the same src
+    copy_needed <- inherits(labs, "tbl_lazy") || inherits(labs, "tbl_sql")
     labs <- labs %>%
-      left_join(cov_data_to_join, by = "FINNGENID")
+      left_join(cov_data_to_join, by = "FINNGENID", copy = copy_needed)
   }
 
   if (lazy) {

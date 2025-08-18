@@ -81,7 +81,12 @@ create_drug_response <- function(conn = NULL, lablist = NULL, druglist = NULL,
   }
 
   print("Querying lab measurements...")
-  lab_measurements <- get_lab_measurements(all_labs=kanta, lablist=lablist, finngen_ids=finngen_ids, require_values = TRUE)
+  lab_measurements <- get_lab_measurements(all_labs = kanta,
+                                           lablist = lablist,
+                                           require_values = TRUE,
+                                           finngen_ids = finngen_ids,
+                                           covariates = covariates,
+                                           covariate_cols = covariate_cols)
 
   if (!is.null(remove_outliers_sd)) {
     if (!is.numeric(remove_outliers_sd) || remove_outliers_sd < 1 || remove_outliers_sd > 6) {
@@ -116,6 +121,14 @@ create_drug_response <- function(conn = NULL, lablist = NULL, druglist = NULL,
   lab_measurements <- lab_measurements %>% mutate(time_to_drug = .data$first_drug_age - .data$EVENT_AGE)
 
   print("generating response summary...")
+
+  # Validate periods early to avoid cryptic errors
+  if (is.null(before_period) || length(before_period) != 2 || !is.numeric(before_period)) {
+    stop("before_period must be a numeric vector of length 2")
+  }
+  if (is.null(after_period) || length(after_period) != 2 || !is.numeric(after_period)) {
+    stop("after_period must be a numeric vector of length 2")
+  }
 
   lab_response <- generate_response_summary(lab_measurements, before_period, after_period)
   cat("Number of individuals with response data: ", nrow(lab_response), "\n")
@@ -168,9 +181,11 @@ create_drug_response <- function(conn = NULL, lablist = NULL, druglist = NULL,
 #' @export
 generate_response_summary <- function(lab_measurements, before_period, after_period, summary_function=median) {
 
+  # Determine lab period relative to the drug initiation
+  # Convention: negative time_to_drug = before; positive = after
   lab_measurements <- lab_measurements %>% mutate(lab_period = case_when(
-    dplyr::between(.data$time_to_drug, after_period[1], after_period[2]) ~ 'Before',
-    dplyr::between(.data$time_to_drug, before_period[1], before_period[2]) ~ 'After',
+    dplyr::between(.data$time_to_drug, before_period[1], before_period[2]) ~ 'Before',
+    dplyr::between(.data$time_to_drug, after_period[1], after_period[2]) ~ 'After',
     TRUE ~ NA_character_
   ))
 
