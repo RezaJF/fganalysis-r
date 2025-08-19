@@ -141,11 +141,17 @@ plot_lab_value_distribution <- function(drug_response, remove_outliers = FALSE) 
   before_period_def <- drug_response$lab_response_period$before_period
   after_period_def <- drug_response$lab_response_period$after_period
 
+  # IMPORTANT: time_to_drug = first_drug_age - EVENT_AGE
+  # So: positive time_to_drug = BEFORE drug; negative time_to_drug = AFTER drug
+  # But the period parameters use the opposite convention:
+  # before_period uses negative values (e.g., c(-1, 0))
+  # after_period uses positive values (e.g., c(0.1, 1))
+  # We need to flip the signs when matching
   lab_data_periods <- drug_response$all_measurements %>%
     filter(!is.na(.data$first_drug_age) & !is.na(.data$MEASUREMENT_VALUE_HARMONIZED)) %>%
     mutate(period = case_when(
-      between(.data$time_to_drug, before_period_def[1], before_period_def[2]) ~ "Before",
-      between(.data$time_to_drug, after_period_def[1], after_period_def[2]) ~ "After",
+      between(.data$time_to_drug, -before_period_def[2], -before_period_def[1]) ~ "Before",
+      between(.data$time_to_drug, -after_period_def[2], -after_period_def[1]) ~ "After",
       TRUE ~ NA_character_
     )) %>%
     filter(!is.na(.data$period))

@@ -182,10 +182,15 @@ create_drug_response <- function(conn = NULL, lablist = NULL, druglist = NULL,
 generate_response_summary <- function(lab_measurements, before_period, after_period, summary_function=median) {
 
   # Determine lab period relative to the drug initiation
-  # Convention: negative time_to_drug = before; positive = after
+  # IMPORTANT: time_to_drug = first_drug_age - EVENT_AGE
+  # So: positive time_to_drug = BEFORE drug; negative time_to_drug = AFTER drug
+  # But the period parameters use the opposite convention for compatibility:
+  # before_period uses negative values (e.g., c(-1, 0) for 1 year to 0 before drug)
+  # after_period uses positive values (e.g., c(0.1, 1) for 0.1 to 1 year after drug)
+  # We need to flip the signs when matching
   lab_measurements <- lab_measurements %>% mutate(lab_period = case_when(
-    dplyr::between(.data$time_to_drug, before_period[1], before_period[2]) ~ 'Before',
-    dplyr::between(.data$time_to_drug, after_period[1], after_period[2]) ~ 'After',
+    dplyr::between(.data$time_to_drug, -before_period[2], -before_period[1]) ~ 'Before',
+    dplyr::between(.data$time_to_drug, -after_period[2], -after_period[1]) ~ 'After',
     TRUE ~ NA_character_
   ))
 
