@@ -1,4 +1,8 @@
 #' @import DBI
+#' @import duckdb
+#' @import duckdbfs
+#' @import bigrquery
+#' @import rjson
 #' @importFrom data.table fread
 #NULL
 get_bigquery_dbplyr <- function(projectid,dataset, table) {
