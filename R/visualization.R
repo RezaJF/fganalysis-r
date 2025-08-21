@@ -3,6 +3,7 @@
 #' @import grDevices
 #' @import UpSetR
 #' @import utils
+#' @import tidyr
 #' @importFrom stats lm quantile sd
 NULL
 
