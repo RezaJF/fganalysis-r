@@ -16,10 +16,18 @@ get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
                                  finngen_ids=NULL, lazy=FALSE,
                                  covariates=NULL, covariate_cols=NULL) {
 
+  # Store the base columns from all_labs (without covariate columns)
+  # Covariate columns will be added later via the join
+  base_return_cols <- unique(c("OMOP_CONCEPT_ID", return_cols))
+
+  # Only select columns that exist in all_labs at this point
+  # Filter out any covariate_cols from base_return_cols if they were accidentally included
   if (!is.null(covariate_cols)) {
-    return_cols <- unique(c(return_cols, covariate_cols))
+    base_return_cols <- setdiff(base_return_cols, covariate_cols)
+    # But ensure we keep the default return_cols
+    base_return_cols <- unique(c("OMOP_CONCEPT_ID", "FINNGENID", "EVENT_AGE", "MEASUREMENT_VALUE_HARMONIZED",
+                                  setdiff(return_cols, covariate_cols)))
   }
-  return_cols <- unique(c("OMOP_CONCEPT_ID", return_cols))
 
   # Ensure robust matching regardless of column/vector types (character vs numeric)
   # The OMOP_CONCEPT_ID column may be stored as DECIMAL in the parquet file
@@ -31,7 +39,7 @@ get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
   # This ensures the comparison works regardless of the storage type
   labs <- all_labs %>%
     mutate(OMOP_CONCEPT_ID = as.character(.data$OMOP_CONCEPT_ID)) %>%
-    select(all_of(return_cols)) %>%
+    select(all_of(base_return_cols)) %>%
     dplyr::filter(.data$OMOP_CONCEPT_ID %in% lablist_chr)
 
   if (!is.null(finngen_ids)) {

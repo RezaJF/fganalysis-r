@@ -133,7 +133,7 @@ nrow(ibd)
 labs <- get_lab_measurements(conn$labs, c("3007461"))
 
 ## Get all drug purchases with ATC codes starting with L01B
-dr <- get_drug_purchases(conn, c("L01B"))
+dr <- get_drug_purchases(conn$pheno, c("L01B"))
 
 # Create drug response data of lab changes after initiating a drug.
 ## First define time intervals from drug purchase to summarise lab values
@@ -163,13 +163,18 @@ This package provides a suite of functions for drug response analysis.
 - **`connect_fgdata(path_to_conf)`**: Connects to the databases specified in the JSON configuration file and returns a `fg_data_connection` object.
 
 ### Data Retrieval
-- **`get_lab_measurements(all_labs, lablist, ..., covariates = NULL, covariate_cols = NULL)`**: Extracts lab measurements for specified OMOP concept IDs. **NEW**: Can now optionally join covariates (e.g., SEX, AGE_AT_DEATH_OR_END_OF_FOLLOWUP) from a separate table.
-- **`get_drug_purchases(all_phenos, druglist, ...)`**: Extracts drug purchases for specified ATC codes. The matching is done on the beginning of the ATC code.
-- **`get_first_purchase(all_phenos, druglist, ...)`**: A wrapper around `get_drug_purchases` to get only the first purchase event for each individual.
+- **`get_lab_measurements(all_labs, lablist, require_values = TRUE, return_cols = c("FINNGENID","OMOP_CONCEPT_ID", "EVENT_AGE", "MEASUREMENT_VALUE_HARMONIZED"), finngen_ids = NULL, lazy = FALSE, covariates = NULL, covariate_cols = NULL)`**: Extracts lab measurements for specified OMOP concept IDs.
+  - `require_values`: If TRUE, only returns rows with non-missing MEASUREMENT_VALUE_HARMONIZED
+  - `return_cols`: Columns to return from the lab data
+  - `finngen_ids`: Optional vector of FINNGENIDs to filter the data
+  - `lazy`: If TRUE, returns a lazy tbl object instead of collecting data
+  - **NEW**: Can now optionally join covariates (e.g., SEX, AGE_AT_DEATH_OR_END_OF_FOLLOWUP) from a separate table via `covariates` and `covariate_cols` parameters. Note: Covariate columns are added through a left join operation and don't need to exist in the lab data table
+- **`get_drug_purchases(all_phenos, druglist, finngen_ids = NULL, return_cols = c("FINNGENID","EVENT_AGE", ATC="CODE1", REIMB_CODE="CODE2", VNR="CODE3", N_PACKS="CODE4"), lazy = FALSE)`**: Extracts drug purchases for specified ATC codes. The matching is done on the beginning of the ATC code.
+- **`get_first_purchase(all_phenos, druglist, finngen_ids = NULL, return_cols = c("FINNGENID","EVENT_AGE","CODE1"), lazy = FALSE)`**: A wrapper around `get_drug_purchases` to get only the first purchase event for each individual.
 
 ### Analysis
 - **`create_drug_response(conn, lablist, druglist, before_period, after_period, finngen_ids = NULL, remove_outliers_sd = NULL, covariates = NULL, covariate_cols = NULL)`**: The main analysis function. It calculates the drug response based on lab value changes before and after the first drug purchase. The `remove_outliers_sd` parameter can be used to remove outliers (specify number of SDs from mean, e.g., 1-6). It can now optionally join in subject-level covariates.
-- **`generate_response_summary(lab_measurements, before_period, after_period, ...)`**: A helper function to calculate the summary statistics for the response (e.g., median value before and after treatment). Called by `create_drug_response`.
+- **`generate_response_summary(lab_measurements, before_period, after_period, summary_function = median)`**: A helper function to calculate the summary statistics for the response (e.g., median value before and after treatment). Called by `create_drug_response`. The `summary_function` parameter allows using different summary statistics (default is median).
 
 ### Summarization and Output
 - **`summarize_drug_response(drug_response, out_file_prefix)`**: Generates a PDF report with plots and tables summarizing the drug response analysis.
@@ -178,7 +183,7 @@ This package provides a suite of functions for drug response analysis.
 - **`plot_lab_value_distribution(drug_response, remove_outliers = FALSE)`**: Creates and returns a `ggplot` object containing violin plots (with overlaid boxplots) that compare the distribution of lab values before and after the first drug purchase. The plot is faceted by drug type and includes statistical significance tests. **UPDATED**: Now uses violin plots with consistent ordering ("Before" always on the left in teal #00AFBB, "After" always on the right in gold #E7B800) and ggpubr styling.
 
 ### BLUP Analysis (Linear Mixed Models)
-- **`calculate_blup_slopes(data, output_dir = ".", min_measurements = 2, include_sex = TRUE, calculate_qc = FALSE, normalize_variance = FALSE, save_model = FALSE, plot_blup_correlation = FALSE)`**: Implements a linear mixed model (LMM) to calculate Best Linear Unbiased Predictors (BLUPs) for individual-specific slopes of lab value changes over age. This follows the methodology from [Wiegrebe et al. (2024) Nature Communications](https://www.nature.com/articles/s41467-024-54483-9). The function:
+- **`calculate_blup_slopes(data, output_dir = ".", min_measurements = 2, include_sex = TRUE, debug_dir = NULL, drug_exposed_only = FALSE, calculate_post_variance = FALSE, calculate_qc = FALSE, normalize_variance = FALSE, save_model = FALSE, plot_blup_correlation = FALSE)`**: Implements a linear mixed model (LMM) to calculate Best Linear Unbiased Predictors (BLUPs) for individual-specific slopes of lab value changes over age. This follows the methodology from [Wiegrebe et al. (2024) Nature Communications](https://www.nature.com/articles/s41467-024-54483-9). The function:
   - **NEW**: Accepts either a `drug.response` object OR a data frame with lab measurements (must contain: FINNGENID, OMOP_CONCEPT_ID, EVENT_AGE, MEASUREMENT_VALUE_HARMONIZED)
   - Fits a model: `lab_value ~ sex + age + (age | FINNGENID)` with random intercepts and slopes
   - Sex is coded according to the PLINK/REGENIE standard (1=Male, 2=Female, 0=Missing/Unknown)
@@ -426,6 +431,11 @@ print(variance_summary)
 ```
 
 This will produce files like `statin_ldl_response_summary.pdf`, `statin_ldl_response_summary_responses_by_drug.txt`, etc., in your working directory.
+
+## Recent Updates
+
+### Bug Fixes
+- **Fixed `get_lab_measurements` covariate handling**: The function now correctly handles covariate columns by only selecting them from the appropriate table after joining. Previously, the function would error if covariate columns didn't exist in the lab data table.
 
 ## Development
 

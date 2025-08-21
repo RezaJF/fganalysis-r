@@ -162,9 +162,8 @@ create_drug_response <- function(conn = NULL, lablist = NULL, druglist = NULL,
     lab_response <- lab_response %>%
       left_join(cov_data_to_join, by = "FINNGENID")
 
-    # Also join with the full measurements data frame
-    lab_measurements <- lab_measurements %>%
-      left_join(cov_data_to_join, by = "FINNGENID")
+    # The covariates are already joined to lab_measurements inside get_lab_measurements,
+    # so we don't need to join them again here. This avoids duplicated columns.
   }
 
   drug.response(responses = lab_response, lab_measurements = lab_measurements,
