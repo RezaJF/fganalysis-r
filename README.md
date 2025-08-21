@@ -453,8 +453,8 @@ When adding new functionality, please add corresponding unit tests in the `tests
 
 ## Authors
 
-- **Mitja Kurki** (Author, Creator) - <mkurki@broadinstitute.org>
-- **Reza Jabal** (Contributor) - <rjabal@broadinstitute.org>
+- **Mitja Kurki, PhD** (Author, Creator) - <mkurki@broadinstitute.org>
+- **Reza Jabal, PhD** (Contributor) - <rjabal@broadinstitute.org>
 
 ## License
 
