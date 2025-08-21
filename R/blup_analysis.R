@@ -373,7 +373,6 @@ calculate_blup_slopes <- function(data, output_dir = ".",
 
           # Create plot if requested
           if (plot_blup_correlation) {
-            library(ggpubr)
             p <- ggpubr::ggscatter(comparison_data,
                                    x = "fixed_slope", y = "slope",
                                    add = "reg.line", conf.int = TRUE,
