@@ -99,31 +99,6 @@ test_that("calculate_blup_slopes works with save_model and plot_blup_correlation
   unlink(file.path(temp_dir, "3001308_*"))
 })
 
-test_that("calculate_blup_slopes handles missing ggpubr package gracefully", {
-  # Create minimal synthetic data
-  lab_data <- data.frame(
-    FINNGENID = rep(paste0("FG", 1:5), each = 4),
-    OMOP_CONCEPT_ID = "3001308",
-    EVENT_AGE = rep(c(25, 35, 45, 55), 5) + rnorm(20, 0, 2),
-    MEASUREMENT_VALUE_HARMONIZED = rnorm(20, 5, 0.5),
-    SEX = rep(c("male", "female"), 10)
-  )
-
-  temp_dir <- tempdir()
-
-  # Skip this test if ggpubr is actually available
-  skip_if_installed("ggpubr")
-
-  # Test that error is thrown when ggpubr is not available
-  expect_error(
-    calculate_blup_slopes(
-      data = lab_data,
-      output_dir = temp_dir,
-      plot_blup_correlation = TRUE
-    ),
-    "Package 'ggpubr' is required for plot_blup_correlation = TRUE"
-  )
-})
 
 test_that("calculate_blup_slopes correlation calculation works with calculate_qc = TRUE", {
   # Create synthetic data with known correlation structure

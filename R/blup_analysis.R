@@ -1,5 +1,7 @@
 #' @import lme4
 #' @import dplyr
+#' @importFrom rlang .
+#' @importFrom stats coef cor.test
 #' @importFrom dplyr %>% group_by filter mutate select left_join distinct summarise
 NULL
 
@@ -362,6 +364,14 @@ calculate_blup_slopes <- function(data, output_dir = ".",
           left_join(fixed_effect_slopes, by = "FINNGENID") %>%
           filter(!is.na(.data$slope) & !is.na(.data$fixed_slope))
 
+        # Add fixed slope to the output dataframe if QC is enabled
+        if (calculate_qc) {
+          fixed_slope_col_name <- paste0(concept_id, "_fixed_slope")
+          output_df <- output_df %>%
+            left_join(fixed_effect_slopes, by = c("FID" = "FINNGENID")) %>%
+            rename(!!fixed_slope_col_name := fixed_slope)
+        }
+
         if (nrow(comparison_data) > 3) {
           # Calculate correlation
           cor_test <- cor.test(comparison_data$slope, comparison_data$fixed_slope)
@@ -373,7 +383,6 @@ calculate_blup_slopes <- function(data, output_dir = ".",
 
           # Create plot if requested
           if (plot_blup_correlation) {
-            library(ggpubr)
             p <- ggpubr::ggscatter(comparison_data,
                                    x = "fixed_slope", y = "slope",
                                    add = "reg.line", conf.int = TRUE,
