@@ -53,7 +53,7 @@ calculate_fixed_slopes <- function(data, min_measurements = 2) {
       }
     ) %>%
     filter(!is.na(.data$fixed_slope)) %>%
-    select(.data$FINNGENID, .data$fixed_slope)
+    select(FINNGENID, fixed_slope)
 
   return(as.data.frame(fixed_slopes))
 }

@@ -103,7 +103,15 @@ test_that("create_drug_response removes outliers correctly", {
   druglist <- c("A01", "A02")
 
   # Test with outlier removal
-  result <- create_drug_response(kanta, phenos, lablist, druglist, c(-1, 0), c(0.1, 1), remove_outliers_sd = 1)
+  result <- create_drug_response(
+    kanta = kanta,
+    phenos = phenos,
+    lablist = lablist,
+    druglist = druglist,
+    before_period = c(-1, 0),
+    after_period = c(0.1, 1),
+    remove_outliers_sd = 1
+  )
 
   # FG4 has the outlier and should be removed from the response
   expect_s3_class(result, "drug.reponse")
@@ -111,8 +119,14 @@ test_that("create_drug_response removes outliers correctly", {
   expect_false("FG4" %in% result$responses$FINNGENID)
 
   # Test that it throws an error with invalid input
-  expect_error(create_drug_response(kanta, phenos, lablist, druglist, c(-1, 0), c(0.1, 1), remove_outliers_sd = 7))
-  expect_error(create_drug_response(kanta, phenos, lablist, druglist, c(-1, 0), c(0.1, 1), remove_outliers_sd = "a"))
+  expect_error(create_drug_response(
+    kanta = kanta, phenos = phenos, lablist = lablist, druglist = druglist,
+    before_period = c(-1, 0), after_period = c(0.1, 1), remove_outliers_sd = 7
+  ))
+  expect_error(create_drug_response(
+    kanta = kanta, phenos = phenos, lablist = lablist, druglist = druglist,
+    before_period = c(-1, 0), after_period = c(0.1, 1), remove_outliers_sd = "a"
+  ))
 })
 
 test_that("summarize_drug_purchases_upset creates a plot file", {
@@ -151,7 +165,7 @@ test_that("get_drug_purchases handles input correctly", {
     CODE3 = c("", "", ""),
     CODE4 = c("1", "1", "1"),
     EVENT_AGE = c(21.0, 20.0, 35)
-  )))
+  ), labs = data.frame()))
 
   expect_error(get_drug_purchases(conn, "A01", finngen_ids = "FG1"), NA)
 })
@@ -282,7 +296,7 @@ test_that("create_drug_response handles covariates correctly", {
 })
 
 # Helper function to create test data for BLUP analysis
-create_test_blup_data <- function() {
+create_test_blup_data <- function(include_sex = FALSE) {
   set.seed(123)  # For reproducibility
 
   # Create longitudinal lab measurements for 20 individuals
@@ -318,11 +332,13 @@ create_test_blup_data <- function() {
     EVENT_AGE = runif(n_individuals, 35, 55)
   )
 
-  # Create sex data
-  sex_data <- data.frame(
-    FINNGENID = individuals,
-    SEX = sample(c("male", "female"), n_individuals, replace = TRUE)
-  )
+  if (include_sex) {
+    sex_data <- data.frame(
+      FINNGENID = individuals,
+      SEX = sample(c("male", "female"), n_individuals, replace = TRUE)
+    )
+    lab_data <- left_join(lab_data, sex_data, by = "FINNGENID")
+  }
 
   # Create drug.response object
   drug.response(
@@ -336,17 +352,15 @@ create_test_blup_data <- function() {
 
 test_that("calculate_blup_slopes works correctly", {
   # Create test data
-  drug_resp_obj <- create_test_blup_data()
-  sex_data <- data.frame(
-    FINNGENID = paste0("FG", 1:20),
-    SEX = sample(c("male", "female"), 20, replace = TRUE)
-  )
+  drug_resp_obj_with_sex <- create_test_blup_data(include_sex = TRUE)
+  drug_resp_obj_no_sex <- create_test_blup_data(include_sex = FALSE)
+
 
   # Create temporary directory for output
   temp_dir <- tempdir()
 
   # Test 1: Function runs without error and produces output files
-  blup_results <- calculate_blup_slopes(drug_resp_obj, sex_data = sex_data,
+  blup_results <- calculate_blup_slopes(drug_resp_obj_with_sex, include_sex = TRUE,
                                         output_dir = temp_dir)
 
   expect_true(is.list(blup_results))
@@ -364,12 +378,12 @@ test_that("calculate_blup_slopes works correctly", {
   }
 
   # Test 2: Function works without sex data
-  blup_results_no_sex <- calculate_blup_slopes(drug_resp_obj, sex_data = NULL,
+  blup_results_no_sex <- calculate_blup_slopes(drug_resp_obj_no_sex, include_sex = FALSE,
                                                 output_dir = temp_dir)
   expect_true(is.list(blup_results_no_sex))
 
   # Test 3: Function handles minimum measurements requirement
-  blup_results_strict <- calculate_blup_slopes(drug_resp_obj, sex_data = sex_data,
+  blup_results_strict <- calculate_blup_slopes(drug_resp_obj_with_sex, include_sex = TRUE,
                                                 output_dir = temp_dir,
                                                 min_measurements = 5)
   # Should have fewer individuals in the analysis
@@ -395,7 +409,7 @@ test_that("summarize_blup_results works correctly", {
   drug_resp_obj <- create_test_blup_data(include_sex = TRUE)
   temp_dir <- tempdir()
 
-  blup_results <- calculate_blup_slopes(drug_resp_obj, output_dir = temp_dir)
+  blup_results <- calculate_blup_slopes(drug_resp_obj, include_sex = TRUE, output_dir = temp_dir)
 
   # Test summarize function
   summary_df <- summarize_blup_results(blup_results)

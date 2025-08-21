@@ -16,7 +16,10 @@ get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
                                  finngen_ids=NULL, lazy=FALSE,
                                  covariates=NULL, covariate_cols=NULL) {
 
-    return_cols <- unique(c("OMOP_CONCEPT_ID", return_cols))
+  if (!is.null(covariate_cols)) {
+    return_cols <- unique(c(return_cols, covariate_cols))
+  }
+  return_cols <- unique(c("OMOP_CONCEPT_ID", return_cols))
 
   # Ensure robust matching regardless of column/vector types (character vs numeric)
   # The OMOP_CONCEPT_ID column may be stored as DECIMAL in the parquet file
