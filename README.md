@@ -451,9 +451,10 @@ devtools::test()
 
 When adding new functionality, please add corresponding unit tests in the `tests/testthat/` directory.
 
-## Author
+## Authors
 
-This package was developed by Dr. Mitja Kurki.
+- **Mitja Kurki** (Author, Creator) - <mkurki@broadinstitute.org>
+- **Reza Jabal** (Contributor) - <rjabal@broadinstitute.org>
 
 ## License
 
