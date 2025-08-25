@@ -245,7 +245,7 @@ flowchart TD
     E --> F
 
     F --> F1{smooth_measurement_intervals?}
-    F1 -->|Yes, provide months (1-12)| F2[Smooth clustered measurements]
+    F1 -->|Yes, provide months 1-12| F2[Smooth clustered measurements]
     F1 -->|No| G
     F2 --> G
 
