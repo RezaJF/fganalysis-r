@@ -13,7 +13,11 @@ calculate_blup_slopes(
   drug_exposed_only = FALSE,
   calculate_post_variance = FALSE,
   calculate_qc = FALSE,
-  normalize_variance = FALSE
+  normalize_variance = FALSE,
+  save_model = FALSE,
+  plot_blup_correlation = FALSE,
+  output_file_prefix = NULL,
+  smooth_measurement_intervals = NULL
 )
 }
 \arguments{
@@ -37,6 +41,17 @@ When TRUE, separate analyses are performed for each unique ATC code.}
 \item{calculate_qc}{Logical indicating whether to calculate quality control metrics including correlation between fixed-effect and BLUP slopes (default: FALSE).}
 
 \item{normalize_variance}{Logical indicating whether to add quantile normalized variance to output files (default: FALSE).}
+
+\item{save_model}{Logical indicating whether to save the fitted lmer model object as an RDS file for each OMOP concept (default: FALSE).}
+
+\item{plot_blup_correlation}{Logical indicating whether to create a scatter plot comparing BLUP slopes with fixed-effect slopes, including correlation coefficient and p-value (default: FALSE). Requires ggpubr package.}
+
+\item{output_file_prefix}{An optional character string to use as a prefix for the output file names. If not provided,
+the OMOP concept ID will be used as the file name.}
+
+\item{smooth_measurement_intervals}{An optional numeric value between 1 and 12. If provided, smooths clustered
+measurements that are less than this number of months apart by replacing them with a single
+measurement (mean age, median value). Defaults to NULL (off).}
 }
 \value{
 A list containing BLUP results for each OMOP_CONCEPT_ID

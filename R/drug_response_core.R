@@ -1,6 +1,12 @@
 #' @import dplyr
 #' @importFrom stats median
+#' @importFrom dplyr bind_rows select mutate filter left_join group_by summarise
+#' @importFrom utils head
+#' @importFrom rlang .data
 NULL
+
+# Declare global variables to avoid R CMD check notes
+utils::globalVariables(c("FINNGENID", "EVENT_AGE", "first_drug_age", "time_to_drug"))
 
 #' @title data object returned from drug response analyse (create_drug_response)
 #' @param responses data frame with response data
@@ -204,4 +210,82 @@ generate_response_summary <- function(lab_measurements, before_period, after_per
               response = .data$after - .data$before) %>% dplyr::filter(!is.na(.data$response))
 
   lab_response
+}
+
+#' @title Get Lab Measurements Before First Drug Purchase
+#' @description Retrieves lab measurements for a given set of labs, filtering for a specific time window
+#' before the first purchase of a specified drug. This function includes all measurements for individuals
+#' who have never purchased the drug. It is a standalone function that handles data retrieval, filtering,
+#' and outlier removal. The output includes a column `n_measurements` showing the total number of
+#' measurements per individual.
+#' @param conn A `fg_data_connection` object.
+#' @param lablist A character vector of OMOP concept IDs for the labs of interest.
+#' @param druglist A character vector of ATC drug codes.
+#' @param months_before A numeric value specifying the time window in months before the first drug
+#' purchase to include lab measurements. Defaults to 3.
+#' @param covariates An optional data frame or lazy table containing covariate data.
+#' @param covariate_cols A character vector of column names to join from the `covariates` table.
+#' @param remove_outliers_sd An optional numeric value specifying the number of standard deviations
+#' to use for outlier removal. Values outside `mean ± sd * remove_outliers_sd` will be removed.
+#' @param winsorize_pct An optional numeric value between 0 and 0.5 for Winsorizing the lab values.
+#' Represents the percentage to winsorize on each tail. For example, 0.05 (5%) will cap values
+#' below the 5th percentile and above the 95th percentile.
+#' @return A data frame of lab measurements with an `n_measurements` column, compatible with `calculate_blup_slopes`.
+#' @export
+get_measurements_before_drug <- function(conn, lablist, druglist, months_before = 3,
+                                         covariates = NULL, covariate_cols = NULL,
+                                         remove_outliers_sd = NULL, winsorize_pct = NULL) {
+
+  if (!is.null(remove_outliers_sd) && !is.null(winsorize_pct)) {
+    stop("Please specify only one outlier removal method: `remove_outliers_sd` or `winsorize_pct`.")
+  }
+
+  # 1. Get all relevant lab measurements and drug purchases
+  lab_measurements <- get_lab_measurements(conn$labs, lablist, require_values = TRUE,
+                                           covariates = covariates, covariate_cols = covariate_cols)
+
+  first_purchases <- get_first_purchase(conn$pheno, druglist) %>%
+    select(FINNGENID, first_drug_age = EVENT_AGE)
+
+  # 2. Join lab data with first purchase data
+  all_measurements <- left_join(lab_measurements, first_purchases, by = "FINNGENID") %>%
+    mutate(time_to_drug = .data$first_drug_age - .data$EVENT_AGE)
+
+  # 3. Handle outlier removal
+  if (!is.null(remove_outliers_sd)) {
+    mean_val <- mean(all_measurements$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE)
+    sd_val <- sd(all_measurements$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE)
+    lower_bound <- mean_val - (remove_outliers_sd * sd_val)
+    upper_bound <- mean_val + (remove_outliers_sd * sd_val)
+
+    all_measurements <- all_measurements %>%
+      filter(.data$MEASUREMENT_VALUE_HARMONIZED >= lower_bound & .data$MEASUREMENT_VALUE_HARMONIZED <= upper_bound)
+  }
+
+  if (!is.null(winsorize_pct)) {
+    all_measurements <- all_measurements %>%
+      mutate(MEASUREMENT_VALUE_HARMONIZED = winsorize_vector(.data$MEASUREMENT_VALUE_HARMONIZED, winsorize_pct))
+  }
+
+  # 4. Filter measurements based on the time window for exposed individuals
+  time_window_years <- months_before / 12
+
+  exposed_measurements <- all_measurements %>%
+    filter(!is.na(.data$first_drug_age) & .data$time_to_drug >= 0 & .data$time_to_drug >= time_window_years)
+
+  unexposed_measurements <- all_measurements %>%
+    filter(is.na(.data$first_drug_age))
+
+  # 5. Combine and add measurement count per individual
+  final_measurements <- bind_rows(exposed_measurements, unexposed_measurements)
+
+  # Add total measurement count per individual
+  measurement_counts <- final_measurements %>%
+    group_by(.data$FINNGENID) %>%
+    summarise(n_measurements = n(), .groups = "drop")
+
+  final_measurements <- final_measurements %>%
+    left_join(measurement_counts, by = "FINNGENID")
+
+  return(final_measurements)
 }

@@ -179,14 +179,12 @@ test_that("calculate_blup_slopes works with direct lab measurement input", {
     )
   })
 
-  # Test error when SEX is required but missing
-  expect_error({
-    calculate_blup_slopes(
-      data = test_lab_data_no_sex,
-      output_dir = temp_dir,
-      include_sex = TRUE  # This should fail
-    )
-  }, "SEX column not found")
+  # Test that the function stops if SEX column is missing and include_sex is TRUE
+  # The error message should now check for either SEX or SEX_IMPUTED
+  expect_error(
+    calculate_blup_slopes(test_lab_data_no_sex, include_sex = TRUE),
+    "SEX or SEX_IMPUTED column not found"
+  )
 
   # Test warning for unsupported options
   expect_warning({

@@ -1,9 +1,15 @@
 #' @import lme4
 #' @import dplyr
-#' @importFrom rlang .
-#' @importFrom stats coef cor.test
-#' @importFrom dplyr %>% group_by filter mutate select left_join distinct summarise
+#' @importFrom rlang .data
+#' @importFrom stats coef cor.test lm
+#' @importFrom dplyr %>% group_by filter mutate select left_join distinct summarise ungroup do rename
+#' @importFrom utils write.table
+#' @importFrom grDevices pdf dev.off
+#' @importFrom ggplot2 ggsave theme_bw
 NULL
+
+# Declare global variables to avoid R CMD check notes
+utils::globalVariables(c(".", "fixed_slope"))
 
 #' @title Calculate BLUP slopes for lab measurements over age
 #' @description Implements a linear mixed model (LMM) to calculate Best Linear Unbiased Predictors (BLUPs)
@@ -23,6 +29,11 @@ NULL
 #' @param normalize_variance Logical indicating whether to add quantile normalized variance to output files (default: FALSE).
 #' @param save_model Logical indicating whether to save the fitted lmer model object as an RDS file for each OMOP concept (default: FALSE).
 #' @param plot_blup_correlation Logical indicating whether to create a scatter plot comparing BLUP slopes with fixed-effect slopes, including correlation coefficient and p-value (default: FALSE). Requires ggpubr package.
+#' @param output_file_prefix An optional character string to use as a prefix for the output file names. If not provided,
+#' the OMOP concept ID will be used as the file name.
+#' @param smooth_measurement_intervals An optional numeric value between 1 and 12. If provided, smooths clustered
+#' measurements that are less than this number of months apart by replacing them with a single
+#' measurement (mean age, median value). Defaults to NULL (off).
 #' @return A list containing BLUP results for each OMOP_CONCEPT_ID
 #' @details The model fitted is:
 #' lab_value_i,t = β0 + β1*sex_i + β2*age_i,t + γ0i + γ1i*age_i,t + ε_i,t
@@ -47,7 +58,9 @@ calculate_blup_slopes <- function(data, output_dir = ".",
                                   calculate_qc = FALSE,
                                   normalize_variance = FALSE,
                                   save_model = FALSE,
-                                  plot_blup_correlation = FALSE) {
+                                  plot_blup_correlation = FALSE,
+                                  output_file_prefix = NULL,
+                                  smooth_measurement_intervals = NULL) {
 
   # Check input type and extract lab data accordingly
   is_drug_response <- inherits(data, "drug.reponse")
@@ -104,24 +117,26 @@ calculate_blup_slopes <- function(data, output_dir = ".",
 
   # Check for SEX column if include_sex is TRUE
   if (include_sex) {
-    if (!"SEX" %in% colnames(lab_data)) {
-      if (is_drug_response) {
-        stop("SEX column not found in drug_response object. ",
-             "Please run create_drug_response() with covariates = conn$cov_pheno ",
-             "and covariate_cols = c('SEX') to include sex data.")
-      } else {
-        stop("SEX column not found in lab measurement data. ",
-             "Please add a SEX column to your data frame or set include_sex = FALSE.")
-      }
+    if ("SEX_IMPUTED" %in% colnames(lab_data)) {
+      # Preferentially use the imputed sex column
+      lab_data <- lab_data %>%
+        mutate(SEX_CODED = case_when(
+          .data$SEX_IMPUTED == 0 ~ 1L,  # Male
+          .data$SEX_IMPUTED == 1 ~ 2L,  # Female
+          TRUE ~ 0L
+        ))
+    } else if ("SEX" %in% colnames(lab_data)) {
+      # Standardise sex coding to PLINK/REGENIE format (1=Male, 2=Female, 0=Missing)
+      lab_data <- lab_data %>%
+        mutate(SEX_CODED = case_when(
+          toupper(.data$SEX) %in% c("M", "male", "MALE", "1") ~ 1L,
+          toupper(.data$SEX) %in% c("F", "female", "FEMALE", "2") ~ 2L,
+          TRUE ~ 0L # All other values (including NA) are coded as missing
+        ))
+    } else {
+      # If neither column is found, raise an error
+      stop("SEX or SEX_IMPUTED column not found. Please add one or set include_sex = FALSE.")
     }
-
-    # Standardise sex coding to PLINK/REGENIE format (1=Male, 2=Female, 0=Missing)
-    lab_data <- lab_data %>%
-      mutate(SEX_CODED = case_when(
-        toupper(.data$SEX) %in% c("M", "male", "MALE", "1") ~ 1L,
-        toupper(.data$SEX) %in% c("F", "female", "FEMALE", "2") ~ 2L,
-        TRUE ~ 0L # All other values (including NA) are coded as missing
-      ))
   } else {
     # If not including sex, create dummy variable where everyone is male (1)
     lab_data$SEX_CODED <- 1L
@@ -146,6 +161,18 @@ calculate_blup_slopes <- function(data, output_dir = ".",
     # Filter data for current concept
     concept_data <- lab_data %>%
       filter(.data$OMOP_CONCEPT_ID == concept_id)
+
+    # Smooth measurement intervals if requested
+    if (!is.null(smooth_measurement_intervals)) {
+      if (!is.numeric(smooth_measurement_intervals) || smooth_measurement_intervals < 1 || smooth_measurement_intervals > 12) {
+        stop("smooth_measurement_intervals must be a numeric value between 1 and 12.")
+      }
+      cat("  Smoothing measurement intervals...\n")
+      concept_data <- concept_data %>%
+        group_by(FINNGENID) %>%
+        do(smooth_measurement_intervals(., min_interval_months = smooth_measurement_intervals)) %>%
+        ungroup()
+    }
 
     # Count measurements per individual
     measurement_counts <- concept_data %>%
@@ -312,7 +339,8 @@ calculate_blup_slopes <- function(data, output_dir = ".",
       output_df[[slope_col_name]][match_idx] <- blup_slopes$slope
 
       # Save to file
-      output_file <- file.path(output_dir, paste0(concept_id, "_DF13.tsv"))
+      file_base_name <- if (!is.null(output_file_prefix)) paste0(output_file_prefix, "_", concept_id) else as.character(concept_id)
+      output_file <- file.path(output_dir, paste0(file_base_name, "_DF13.tsv"))
       write.table(output_df,
                   file = output_file,
                   sep = "\t",
@@ -324,7 +352,7 @@ calculate_blup_slopes <- function(data, output_dir = ".",
       # Save model if requested
       model_file <- NULL
       if (save_model) {
-        model_file <- file.path(output_dir, paste0(concept_id, "_model.rds"))
+        model_file <- file.path(output_dir, paste0(file_base_name, "_model.rds"))
         saveRDS(lmm_model, file = model_file)
         cat(paste0("Saved model to: ", model_file, "\n"))
       }
@@ -385,7 +413,9 @@ calculate_blup_slopes <- function(data, output_dir = ".",
           if (plot_blup_correlation) {
             p <- ggpubr::ggscatter(comparison_data,
                                    x = "fixed_slope", y = "slope",
+                                   color = "#4b4843", shape = 20, size = 2,
                                    add = "reg.line", conf.int = TRUE,
+                                   add.params = list(color = "#6742d7"),
                                    cor.coef = TRUE, cor.method = "pearson",
                                    xlab = "Fixed-Effect Slope (OLS)",
                                    ylab = "BLUP Slope",
@@ -395,7 +425,7 @@ calculate_blup_slopes <- function(data, output_dir = ".",
                                                    ", p = ", format.pval(cor_test$p.value, digits = 3))) +
               ggplot2::theme_bw()
 
-            plot_file <- file.path(output_dir, paste0(concept_id, "_blup_correlation.pdf"))
+            plot_file <- file.path(output_dir, paste0(file_base_name, "_blup_correlation.pdf"))
             ggplot2::ggsave(plot_file, plot = p, width = 8, height = 6)
             cat(paste0("Saved correlation plot to: ", plot_file, "\n"))
           }

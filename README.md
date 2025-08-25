@@ -175,6 +175,19 @@ This package provides a suite of functions for drug response analysis.
 ### Analysis
 - **`create_drug_response(conn, lablist, druglist, before_period, after_period, finngen_ids = NULL, remove_outliers_sd = NULL, covariates = NULL, covariate_cols = NULL)`**: The main analysis function. It calculates the drug response based on lab value changes before and after the first drug purchase. The `remove_outliers_sd` parameter can be used to remove outliers (specify number of SDs from mean, e.g., 1-6). It can now optionally join in subject-level covariates.
 - **`generate_response_summary(lab_measurements, before_period, after_period, summary_function = median)`**: A helper function to calculate the summary statistics for the response (e.g., median value before and after treatment). Called by `create_drug_response`. The `summary_function` parameter allows using different summary statistics (default is median).
+- **`get_measurements_before_drug(conn, lablist, druglist, months_before = 3, covariates = NULL, covariate_cols = NULL, remove_outliers_sd = NULL, winsorize_pct = NULL)`**: A standalone function to retrieve lab measurements, specifically designed for preparing data for BLUP analysis. It filters measurements to a specified window before a drug purchase for exposed individuals and includes all measurements for unexposed individuals.
+  - `conn`: A `fg_data_connection` object.
+  - `lablist`: A character vector of OMOP concept IDs for the labs of interest.
+  - `druglist`: A character vector of ATC drug codes to define the "exposed" cohort.
+  - `months_before`: The time window in months before the first drug purchase to include lab measurements (default is 3).
+  - `covariates`: An optional data frame or lazy table containing covariate data (e.g., `conn$cov_pheno`).
+  - `covariate_cols`: A character vector of column names to join from the `covariates` table (e.g., `c("SEX")`).
+  - `remove_outliers_sd`: Optional parameter to remove outliers based on standard deviation (e.g., `remove_outliers_sd = 4`).
+  - `winsorize_pct`: Optional parameter to cap extreme values using Winsorization. Values between 0 and 0.5 specify the percentage to winsorize on each tail (e.g., `winsorize_pct = 0.05` caps values below the 5th percentile and above the 95th percentile). This is a percentage to winsorise on each tail which is equivalent of (1- `winsorize_pct`) proportion to keep:
+      - insorize_pct = 0.01 → Caps at 1st and 99th percentiles (1% on each tail)
+      - winsorize_pct = 0.05 → Caps at 5th and 95th percentiles (5% on each tail)
+      - winsorize_pct = 0.10 → Caps at 10th and 90th percentiles (10% on each tail)
+   Note: Only one outlier removal method (`remove_outliers_sd` or `winsorize_pct`) should be used at a time.
 
 ### Summarization and Output
 - **`summarize_drug_response(drug_response, out_file_prefix)`**: Generates a PDF report with plots and tables summarizing the drug response analysis.
@@ -183,7 +196,7 @@ This package provides a suite of functions for drug response analysis.
 - **`plot_lab_value_distribution(drug_response, remove_outliers = FALSE)`**: Creates and returns a `ggplot` object containing violin plots (with overlaid boxplots) that compare the distribution of lab values before and after the first drug purchase. The plot is faceted by drug type and includes statistical significance tests. **UPDATED**: Now uses violin plots with consistent ordering ("Before" always on the left in teal #00AFBB, "After" always on the right in gold #E7B800) and ggpubr styling.
 
 ### BLUP Analysis (Linear Mixed Models)
-- **`calculate_blup_slopes(data, output_dir = ".", min_measurements = 2, include_sex = TRUE, debug_dir = NULL, drug_exposed_only = FALSE, calculate_post_variance = FALSE, calculate_qc = FALSE, normalize_variance = FALSE, save_model = FALSE, plot_blup_correlation = FALSE)`**: Implements a linear mixed model (LMM) to calculate Best Linear Unbiased Predictors (BLUPs) for individual-specific slopes of lab value changes over age. This follows the methodology from [Wiegrebe et al. (2024) Nature Communications](https://www.nature.com/articles/s41467-024-54483-9). The function:
+- **`calculate_blup_slopes(data, output_dir = ".", min_measurements = 2, include_sex = TRUE, debug_dir = NULL, drug_exposed_only = FALSE, calculate_post_variance = FALSE, calculate_qc = FALSE, normalize_variance = FALSE, save_model = FALSE, plot_blup_correlation = FALSE, output_file_prefix = NULL, smooth_measurement_intervals = NULL)`**: Implements a linear mixed model (LMM) to calculate Best Linear Unbiased Predictors (BLUPs) for individual-specific slopes of lab value changes over age. This follows the methodology from [Wiegrebe et al. (2024) Nature Communications](https://www.nature.com/articles/s41467-024-54483-9). The function:
   - **NEW**: Accepts either a `drug.response` object OR a data frame with lab measurements (must contain: FINNGENID, OMOP_CONCEPT_ID, EVENT_AGE, MEASUREMENT_VALUE_HARMONIZED)
   - Fits a model: `lab_value ~ sex + age + (age | FINNGENID)` with random intercepts and slopes
   - Sex is coded according to the PLINK/REGENIE standard (1=Male, 2=Female, 0=Missing/Unknown)
@@ -199,6 +212,8 @@ This package provides a suite of functions for drug response analysis.
     - When `save_model = TRUE`: Saves the fitted lmer model object as an RDS file (`{OMOP_CONCEPT_ID}_model.rds`)
     - When `plot_blup_correlation = TRUE`: Creates a scatter plot comparing BLUP slopes with fixed-effect slopes, including correlation coefficient, p-value, and regression line with confidence interval (requires `ggpubr` package)
     - Plot uses `theme_bw()` and is saved as `{OMOP_CONCEPT_ID}_blup_correlation.pdf`
+  - **NEW: Interval Smoothing**:
+    - The `smooth_measurement_intervals` parameter accepts a numeric value (1-12) to smooth clustered measurements that are less than the specified number of months apart by replacing them with a single representative measurement (mean age, median value). This can produce more stable estimates of long-term trajectories.
   - Returns a list with model details and BLUP estimates for each lab measurement type
 
 #### Scaling and Back-transformation Note
@@ -229,7 +244,12 @@ flowchart TD
     C --> F[For each OMOP_CONCEPT_ID]
     E --> F
 
-    F --> G{Sufficient data?}
+    F --> F1{smooth_measurement_intervals?}
+    F1 -->|Yes, provide months (1-12)| F2[Smooth clustered measurements]
+    F1 -->|No| G
+    F2 --> G
+
+    G{Sufficient data?}
     G -->|< 10 individuals| H[Skip concept]
     G -->|>= 10 individuals| I[Standardize variables]
 
@@ -272,6 +292,7 @@ flowchart TD
     style S fill:#9f6
     style V fill:#6cf
     style AA fill:#6cf
+    style F2 fill:#6cf
 ```
 
 - **`summarize_blup_results(blup_results)`**: Provides summary statistics (mean, SD, min, max) for the BLUP slopes from each OMOP concept.
@@ -394,7 +415,7 @@ for (concept_id in names(blup_results)) {
   }
 }
 
-# 8b. (NEW) Calculate BLUP slopes directly from lab measurements
+# 8b. Calculate BLUP slopes directly from lab measurements
 #     This allows BLUP analysis without drug response analysis
 # Option 1: Pull lab measurements with covariates using the new functionality
 lab_measurements <- get_lab_measurements(conn$labs,
@@ -421,6 +442,45 @@ blup_results_no_sex <- calculate_blup_slopes(lab_measurements_no_cov,
                                               output_dir = "blup_output_direct",
                                               include_sex = FALSE,  # Must be FALSE without SEX column
                                               calculate_qc = TRUE)
+
+# 8c. Get measurements before drug purchase for BLUP analysis
+# This standalone function is the recommended way to prepare data for BLUP analysis,
+# as it handles filtering before a drug purchase and outlier removal in a single step.
+
+# Example 1: Using standard deviation for outlier removal
+measurements_for_blup_sd <- get_measurements_before_drug(
+  conn = conn,
+  lablist = c("3001308"), # LDL
+  druglist = c("C10AA"),  # Statins
+  months_before = 12,     # 1 year window before first purchase
+  covariates = conn$cov_pheno,
+  covariate_cols = c("SEX"),
+  remove_outliers_sd = 4  # Remove values > 4 SD from the mean
+)
+
+# Example 2: Using Winsorizing for outlier removal
+measurements_before_drug_purchase <- get_measurements_before_drug(
+  conn = conn,
+  lablist = c("3001308"),
+  druglist = c("C10AA"),
+  months_before = 12,
+  covariates = conn$cov_pheno,
+  covariate_cols = c("SEX"),
+  winsorize_pct = 0.05 # Cap values at the 5th and 95th percentiles
+)
+
+# The resulting dataframe can be passed directly to calculate_blup_slopes()
+# blup_results <- calculate_blup_slopes(
+#   data = measurements_for_blup_sd,
+#   output_dir = "blup_output"
+# )
+
+# 8d. (NEW) Example of using interval smoothing for BLUP calculation
+blup_results_smoothed <- calculate_blup_slopes(
+  data = measurements_for_blup_sd,
+  output_dir = "blup_output_smoothed",
+  smooth_measurement_intervals = 6 # Activate smoothing for measurements < 6 months apart
+)
 
 # 9. (Optional) Process variance files with quantile normalization
 #    This creates summary statistics and comparison plots
@@ -453,8 +513,8 @@ When adding new functionality, please add corresponding unit tests in the `tests
 
 ## Authors
 
-- **Mitja Kurki** (Author, Creator) - <mkurki@broadinstitute.org>
-- **Reza Jabal** (Contributor) - <rjabal@broadinstitute.org>
+- **Mitja Kurki, PhD** (Author, Creator) - <mkurki@broadinstitute.org>
+- **Reza Jaba, PhD** (Contributor) - <rjabal@broadinstitute.org>
 
 ## License
 

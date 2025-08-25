@@ -1,8 +1,13 @@
 #' @importFrom stats qnorm quantile cor lm predict sd
-#' @importFrom dplyr %>% group_by summarise mutate select n
+#' @importFrom dplyr %>% group_by summarise mutate select n filter pull arrange
 #' @importFrom graphics hist par text plot.new
 #' @importFrom grDevices dev.new
+#' @importFrom rlang .data
+#' @importFrom utils read.table write.table
 NULL
+
+# Declare global variables to avoid R CMD check notes
+utils::globalVariables(c("FINNGENID", "fixed_slope"))
 
 #' @title Quantile Normalize Values
 #' @description Performs quantile normalization on a numeric vector
@@ -266,4 +271,65 @@ generate_variance_plots <- function(summary_list) {
       readline()
     }
   }
+}
+
+#' @title Winsorize a Numeric Vector
+#' @description Caps extreme values in a numeric vector at specified percentiles.
+#' This is used to mitigate the influence of outliers without removing them.
+#' @param x A numeric vector.
+#' @param winsorize_pct A numeric value between 0 and 0.5 representing the
+#' percentage to winsorize on each tail. For example, 0.05 (5%) will cap values
+#' below the 5th percentile and above the 95th percentile.
+#' @return A numeric vector with extreme values capped.
+#' @export
+winsorize_vector <- function(x, winsorize_pct = 0.01) {
+  if (!is.numeric(x) || !is.numeric(winsorize_pct) || winsorize_pct < 0 || winsorize_pct > 0.5) {
+    stop("Invalid input for winsorize_vector. winsorize_pct must be between 0 and 0.5")
+  }
+
+  lower_bound <- quantile(x, winsorize_pct, na.rm = TRUE)
+  upper_bound <- quantile(x, 1 - winsorize_pct, na.rm = TRUE)
+
+  x[x < lower_bound] <- lower_bound
+  x[x > upper_bound] <- upper_bound
+
+  return(x)
+}
+
+#' @title Smooth Measurement Intervals
+#' @description For a given individual's data, this function identifies clusters of measurements
+#' that are less than a specified number of months apart and replaces each cluster with a single
+#' representative measurement (mean age, mode value).
+#' @param df A data frame for a single individual, containing EVENT_AGE and MEASUREMENT_VALUE_HARMONIZED.
+#' @param min_interval_months The minimum interval in months. Measurements closer than this will be clustered. Defaults to 6.
+#' @return A data frame with smoothed measurement intervals.
+#' @export
+smooth_measurement_intervals <- function(df, min_interval_months = 6) {
+  if (nrow(df) < 2) {
+    return(df)
+  }
+
+  df <- df %>% arrange(EVENT_AGE)
+
+  # Calculate time difference to the previous measurement in months
+  df <- df %>%
+    mutate(time_diff = c(NA, diff(EVENT_AGE) * 12))
+
+  # Identify cluster boundaries (where time_diff is >= min_interval_months)
+  df <- df %>%
+    mutate(cluster_id = cumsum(is.na(time_diff) | time_diff >= min_interval_months))
+
+  # Summarize each cluster
+  smoothed_df <- df %>%
+    group_by(cluster_id) %>%
+    summarise(
+      EVENT_AGE = mean(EVENT_AGE, na.rm = TRUE),
+      MEASUREMENT_VALUE_HARMONIZED = median(MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE),
+      # Carry over other necessary columns, taking the first value in the cluster
+      across(any_of(c("FINNGENID", "OMOP_CONCEPT_ID", "SEX_CODED")), first),
+      .groups = "drop"
+    ) %>%
+    select(-cluster_id)
+
+  return(smoothed_df)
 }

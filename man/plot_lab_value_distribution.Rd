@@ -13,9 +13,11 @@ plot_lab_value_distribution(drug_response, remove_outliers = FALSE)
 using the 1.5 * IQR rule. Defaults to `FALSE`.}
 }
 \value{
-A `ggplot` object.
+A `ggplot` object with consistent ordering and ggpubr color palette.
 }
 \description{
-Creates a boxplot comparing the distribution of lab values
+Creates a violin plot comparing the distribution of lab values
 before and after the first drug purchase, faceted by drug type.
+The plot uses consistent ordering with "Before" always on the left (teal)
+and "After" always on the right (gold).
 }

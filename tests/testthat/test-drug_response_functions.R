@@ -167,7 +167,7 @@ test_that("get_drug_purchases handles input correctly", {
     EVENT_AGE = c(21.0, 20.0, 35)
   ), labs = data.frame()))
 
-  expect_error(get_drug_purchases(conn, "A01", finngen_ids = "FG1"), NA)
+  expect_error(get_drug_purchases(conn$pheno, "A01", finngen_ids = "FG1"), NA)
 })
 
 # Helper function to create a realistic drug.response object for testing
