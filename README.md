@@ -19,17 +19,16 @@ Sys.setenv(MAKEFLAGS = "-j 4")
 devtools::install("path/to/fganalysis")
 
 ## in sandbox, you can just
-install.packages("fganalysis")
+
+
+library(devtools)
+load_all("/finngen/shared_nfs/finngen/code/fganalysis/")
+conn <- connect_fgdata("/finngen/shared_nfs/finngen/code/fganalysis/config/db_config_sb.json")
+
 
 ```
 
 ## Usage
-
-After installing the package, you can load it using:
-
-```R
-library("fganalysis")
-```
 
 ### Functions
 
@@ -45,8 +44,8 @@ Here is a simple example of how to use the package:
 
 ```R
 # Load the package
-library(fganalysis)
 
+load_all("/finngen/shared_nfs/finngen/code/fganalysis/")
 ## get connection to data sources. in sanbox you can find data source configuration in /finngen/shared_nfs/finngen/code/drugResponsePackage/config/db_config_sb.json
 conn <- connect_fgdata("config/db_config.json")
 ### SANDBOX

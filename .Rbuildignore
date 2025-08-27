@@ -2,5 +2,6 @@
 ^\.Rproj\.user$
 .github/
 scripts/
-config/
+config/db_config_mitja.json
+^.*\.pdf$
 .lintr
