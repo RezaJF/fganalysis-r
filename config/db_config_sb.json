@@ -23,5 +23,9 @@
         "path":  "/finngen/shared_nfs/R13/phenos/VNR_fi_2.0_dedup.tsv",
         "type": "tsv",
         "recodings": [{"column":"VNR", "function": "as.character"}]
+    },
+    "long_anthropometric": {
+        "path": "/finngen/shared_nfs/R13/phenos/finngen_R13_hilmo_avohilmo_extended_1.0_dedup_fixbp.parquet",
+        "type": "parquet"
     }
 }
