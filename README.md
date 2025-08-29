@@ -82,9 +82,9 @@ dr <- get_drug_purchases(conn, c("L01B"))
 before_period <- c(-1, 0)
 after_period <- c(1/12, 1)
 
-## create a dataframe containing LDL (omopid 3001308) response to first statin purchase (ATC codes starting with A10) for each finngen ID  
-resp <- create_drug_response(conn,conn$pheno,c("3001308"), 
-                             druglist=c("A10"),before_period,after_period)
+## create a dataframe containing LDL (omopid 3001308) response to first statin purchase (ATC codes starting with C10AA) for each finngen ID  
+resp <- create_drug_response(conn,c("3001308"), 
+                             druglist=c("C10AA"),before_period,after_period)
 ## create plots and tables of the respons
 summarize_drug_response(resp, out_file_prefix="3001308_A10_resp")
 
