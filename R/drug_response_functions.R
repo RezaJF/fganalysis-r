@@ -41,7 +41,7 @@ before_period, after_period, finngen_ids=NULL) {
   print("Querying lab measurements...")
   lab_measurements <- get_lab_measurements(all_labs=conn$labs, lablist=lablist, finngen_ids=finngen_ids, require_values = TRUE)
   
-  all_fg_ids <- unique(c(lab_measurements$FINNGENID, finngen_ids))
+  all_fg_ids <- unique(c(lab_measurements$FINNGENID), finngen_ids)
   print("Querying purchases...")
   drug_purchases <- get_drug_purchases(conn, druglist, all_fg_ids)
   
@@ -91,10 +91,14 @@ summarize_drug_response <- function(drug_response, out_file_prefix) {
 
   range_baseline_age <- quant_text(responses$n_before)
 
-  plot(ggtexttable(data.frame("Group"=c("labs","drugs","in analysis"),
-                         "N"= c(inds_with_lab, inds_with_drugs, inds_in_analysis),
-                         "N events" = c(n_lab_meas, n_drugs_meas, inds_in_analysis)), rows=NULL))
+  n_no_pre <- drug_response$responses %>% filter(is.na( response ) & n_before==0) 
+  n_no_pos <- drug_response$responses %>% filter(is.na( response ) & n_after==0)
+
+  plot(ggtexttable(data.frame("Group"=c("labs","drugs","in analysis","no_pre_value", "no_post_value"),
+                         "N"= c(inds_with_lab, inds_with_drugs, inds_in_analysis, nrow(n_no_pre), nrow(n_no_pos)),
+                         "N events" = c(n_lab_meas, n_drugs_meas, inds_in_analysis, sum(n_no_pre$n_after), sum(n_no_pos$n_before))), rows=NULL))
   
+
 
   per_drug <- responses %>% group_by(.data$first_drug) %>% 
     summarise(N=n(),p=summary(lm("response ~ 1", data=pick(.data$FINNGENID,.data$response)))$coefficients[1,4],sd=sd(.data$response),
@@ -180,8 +184,9 @@ generate_response_summary <- function(lab_measurements, before_period, after_per
               n_after = length(.data$MEASUREMENT_VALUE_HARMONIZED[.data$lab_period=='After']),
               baseline_age = first(.data$first_drug_age),
               first_drug = first(.data$first_drug),
-              response = .data$after - .data$before) %>% dplyr::filter(!is.na(.data$response))
-  
+              response = .data$after - .data$before) 
+  #%>% dplyr::filter(!is.na(.data$response))
+
   return(lab_response)
 }
 
