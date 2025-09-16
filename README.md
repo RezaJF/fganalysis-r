@@ -80,13 +80,16 @@ dr <- get_drug_purchases(conn, c("L01B"))
 ## here defining pre-measurements drug measurements to be 1 year before drug and 
 ## after period to be 1month to 1 year.
 before_period <- c(-1, 0)
-after_period <- c(1/12, 1)
+after_period <- c(3/12, 1)
 
 ## create a dataframe containing LDL (omopid 3001308) response to first statin purchase (ATC codes starting with C10AA) for each finngen ID  
+## you can filter min/max values by providing vector of length 2 specifying min and max lab values values accepted
+min_max <- c(0,20)
 resp <- create_drug_response(conn,c("3001308"), 
-                             druglist=c("C10AA"),before_period,after_period)
+                             druglist=c("C10AA"),before_period,after_period,
+                              filter_min_max=min_max)
 ## create plots and tables of the respons
-summarize_drug_response(resp, out_file_prefix="3001308_A10_resp")
+summarize_drug_response(resp, out_file_prefix="3001308_C10AA_resp")
 
 
 

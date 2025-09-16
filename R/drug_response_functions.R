@@ -5,6 +5,7 @@
 #' @importFrom stats median lm quantile sd
 #' @import utils
 #' @import grDevices
+#' @importFrom checkmate assertClass
 #NULL
 
 #' @title data object returned from drug response analyse (create_drug_response)
@@ -28,19 +29,29 @@ drug.response <- function(responses, lab_measurements, drug_purchases, before_pe
 #' @param druglist vector of drug ATC codes. The ATC codes are matched with the first part of the code (e.g. A01*). 
 #' @param before_period vector with two elements, start and end of the before period
 #' @param after_period vector with two elements, start and end of the after period
+#' @param filter_min_max vector of length 2, min and max values to filter lab measurements (default c(-Inf, Inf))
 #' @param finngen_ids vector of FINNGENIDs to filter the data
 #' @return drug.response object
 #' @export
 create_drug_response <- function(conn, lablist, druglist, 
-before_period, after_period, finngen_ids=NULL) {
+before_period, after_period, filter_min_max=c(-Inf,Inf), finngen_ids=NULL) {
 
   if(!inherits(conn, "fg_data_connection")) {
     stop("conn must be a fg_data_connection object")
   }
 
+  #assert_class( filter_function, "dplyr::filter" )
+
   print("Querying lab measurements...")
-  lab_measurements <- get_lab_measurements(all_labs=conn$labs, lablist=lablist, finngen_ids=finngen_ids, require_values = TRUE)
+  lab_measurements <- get_lab_measurements(all_labs=conn$labs, lablist=lablist, finngen_ids=finngen_ids, 
+  require_values = TRUE) 
   
+  orig <- nrow(lab_measurements)
+  lab_measurements <- lab_measurements %>% filter(.data$MEASUREMENT_VALUE_HARMONIZED >= filter_min_max[1] & 
+                                                .data$MEASUREMENT_VALUE_HARMONIZED <= filter_min_max[2])
+
+  print(paste0("Filtered ", orig - nrow(lab_measurements), " measurements due to min and max filters"))
+
   all_fg_ids <- unique(c(lab_measurements$FINNGENID), finngen_ids)
   print("Querying purchases...")
   drug_purchases <- get_drug_purchases(conn, druglist, all_fg_ids)
@@ -54,7 +65,7 @@ before_period, after_period, finngen_ids=NULL) {
   print("generating response summary...")
 
   lab_response <- generate_response_summary(lab_measurements, before_period, after_period)
-  cat("Number of individuals with response data: ", nrow(lab_response), "\n")
+  print(paste0("Number of individuals with response data: ", nrow(lab_response)))
   
   return(drug.response(responses=lab_response, lab_measurements=lab_measurements,
                               drug_purchases=drug_purchases, before_period, after_period))
@@ -99,7 +110,7 @@ summarize_drug_response <- function(drug_response, out_file_prefix) {
                          "N events" = c(n_lab_meas, n_drugs_meas, inds_in_analysis, sum(n_no_pre$n_after), sum(n_no_pos$n_before))), rows=NULL))
   
 
-
+  responses <- responses %>% filter(!is.na(response))
   per_drug <- responses %>% group_by(.data$first_drug) %>% 
     summarise(N=n(),p=summary(lm("response ~ 1", data=pick(.data$FINNGENID,.data$response)))$coefficients[1,4],sd=sd(.data$response),
     response=mean(.data$response),
