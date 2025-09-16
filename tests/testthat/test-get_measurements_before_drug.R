@@ -36,12 +36,16 @@ test_that("get_measurements_before_drug works as a standalone function", {
     conn,
     lablist = "3001308",
     druglist = "C10AA",
+    months_before = 3,
     covariates = conn$cov_pheno,
     covariate_cols = "SEX"
   )
 
-  # Expectations remain the same as the logic hasn't changed, just the test setup
-  expect_equal(nrow(measurements), 2 + 1 + 2 + 1)
+  # With months_before = 3 (0.25 years), we expect:
+  # FG1: 2 measurements (50.0 and 50.1 are before drug at 50.2)
+  # FG2: 1 measurement (60.0 is before drug at 60.1)
+  # FG3 and FG4: no drug purchases, so no measurements included
+  expect_equal(nrow(measurements), 3)
   expect_true("SEX" %in% colnames(measurements))
 
   # Filter to ensure there are rows for FG1 before pulling
@@ -70,6 +74,7 @@ test_that("outlier removal works correctly", {
     conn,
     lablist = "3001308",
     druglist = "C10AA",
+    months_before = 3,
     remove_outliers_sd = 1
   )
   # The value 500 from FG4 should be removed
@@ -80,6 +85,7 @@ test_that("outlier removal works correctly", {
     conn,
     lablist = "3001308",
     druglist = "C10AA",
+    months_before = 3,
     winsorize_pct = 0.1  # 10% winsorization on each tail
   )
   # The value 500 should be capped at the 90th percentile

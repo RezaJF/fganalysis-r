@@ -313,23 +313,41 @@ smooth_measurement_intervals <- function(df, min_interval_months = 6) {
 
   # Calculate time difference to the previous measurement in months
   df <- df %>%
-    mutate(time_diff = c(NA, diff(EVENT_AGE) * 12))
+    mutate(time_diff = c(NA, diff(.data$EVENT_AGE) * 12))
 
   # Identify cluster boundaries (where time_diff is >= min_interval_months)
   df <- df %>%
-    mutate(cluster_id = cumsum(is.na(time_diff) | time_diff >= min_interval_months))
+    mutate(cluster_id = cumsum(is.na(.data$time_diff) | .data$time_diff >= min_interval_months))
 
   # Summarize each cluster
   smoothed_df <- df %>%
-    group_by(cluster_id) %>%
+    group_by(.data$cluster_id) %>%
     summarise(
-      EVENT_AGE = mean(EVENT_AGE, na.rm = TRUE),
-      MEASUREMENT_VALUE_HARMONIZED = median(MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE),
+      EVENT_AGE = mean(.data$EVENT_AGE, na.rm = TRUE),
+      MEASUREMENT_VALUE_HARMONIZED = median(.data$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE),
       # Carry over other necessary columns, taking the first value in the cluster
       across(any_of(c("FINNGENID", "OMOP_CONCEPT_ID", "SEX_CODED")), first),
       .groups = "drop"
     ) %>%
-    select(-cluster_id)
+    select(-.data$cluster_id)
 
   return(smoothed_df)
+}
+
+#' @title Filter Outliers using Median Absolute Deviation (MAD)
+#' @description Removes outliers from a numeric vector based on the Median Absolute Deviation (MAD).
+#' This method is generally more robust than standard deviation-based outlier removal.
+#' @param x A numeric vector.
+#' @param th The threshold for MAD. A higher value is more conservative. Defaults to 5.
+#' @return A numeric vector with outliers removed.
+#' @importFrom stats mad
+#' @export
+filter_outliers_mad <- function(x, th = 3) {
+  median_x <- median(x, na.rm = TRUE)
+  mad_x <- stats::mad(x, na.rm = TRUE)
+
+  lower_bound <- median_x - th * mad_x
+  upper_bound <- median_x + th * mad_x
+
+  return(x[x >= lower_bound & x <= upper_bound])
 }

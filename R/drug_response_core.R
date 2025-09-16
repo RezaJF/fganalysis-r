@@ -230,14 +230,20 @@ generate_response_summary <- function(lab_measurements, before_period, after_per
 #' @param winsorize_pct An optional numeric value between 0 and 0.5 for Winsorizing the lab values.
 #' Represents the percentage to winsorize on each tail. For example, 0.05 (5%) will cap values
 #' below the 5th percentile and above the 95th percentile.
+#' @param range_sd_filter An optional list with `lower_bound`, `upper_bound`, and `nsd` for
+#' range-based standard deviation filtering.
 #' @return A data frame of lab measurements with an `n_measurements` column, compatible with `calculate_blup_slopes`.
 #' @export
-get_measurements_before_drug <- function(conn, lablist, druglist, months_before = 3,
+get_measurements_before_drug <- function(conn, lablist, druglist, months_before,
                                          covariates = NULL, covariate_cols = NULL,
-                                         remove_outliers_sd = NULL, winsorize_pct = NULL) {
+                                         remove_outliers_sd = NULL, winsorize_pct = NULL,
+                                         range_sd_filter = NULL) {
 
   if (!is.null(remove_outliers_sd) && !is.null(winsorize_pct)) {
     stop("Please specify only one outlier removal method: `remove_outliers_sd` or `winsorize_pct`.")
+  }
+  if ((!is.null(remove_outliers_sd) || !is.null(winsorize_pct)) && !is.null(range_sd_filter)) {
+    stop("`range_sd_filter` cannot be used with `remove_outliers_sd` or `winsorize_pct`.")
   }
 
   # 1. Get all relevant lab measurements and drug purchases
@@ -252,6 +258,32 @@ get_measurements_before_drug <- function(conn, lablist, druglist, months_before 
     mutate(time_to_drug = .data$first_drug_age - .data$EVENT_AGE)
 
   # 3. Handle outlier removal
+  if (!is.null(range_sd_filter)) {
+    # Validate the filter parameters
+    required_params <- c("lower_bound", "upper_bound", "nsd")
+    if (!is.list(range_sd_filter) || !all(required_params %in% names(range_sd_filter))) {
+      stop("`range_sd_filter` must be a list containing `lower_bound`, `upper_bound`, and `nsd`.")
+    }
+
+    # Calculate mean and sd on values within the specified range
+    ranged_data <- all_measurements %>%
+      filter(.data$MEASUREMENT_VALUE_HARMONIZED >= range_sd_filter$lower_bound &
+             .data$MEASUREMENT_VALUE_HARMONIZED <= range_sd_filter$upper_bound)
+
+    mean_val <- mean(ranged_data$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE)
+    sd_val <- sd(ranged_data$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE)
+
+    # Define outlier bounds based on the ranged statistics
+    lower_bound_stat <- mean_val - (range_sd_filter$nsd * sd_val)
+    upper_bound_stat <- mean_val + (range_sd_filter$nsd * sd_val)
+
+    original_rows <- nrow(all_measurements)
+    all_measurements <- all_measurements %>%
+      filter(.data$MEASUREMENT_VALUE_HARMONIZED >= lower_bound_stat & .data$MEASUREMENT_VALUE_HARMONIZED <= upper_bound_stat)
+    removed_rows <- original_rows - nrow(all_measurements)
+    print(paste("Removed", removed_rows, "outliers using range_sd_filter."))
+  }
+
   if (!is.null(remove_outliers_sd)) {
     mean_val <- mean(all_measurements$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE)
     sd_val <- sd(all_measurements$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE)
@@ -288,4 +320,144 @@ get_measurements_before_drug <- function(conn, lablist, druglist, months_before 
     left_join(measurement_counts, by = "FINNGENID")
 
   return(final_measurements)
+}
+
+#' @title Get Median Lab Values Before Drug Purchase with MAD Outlier Removal
+#' @description Calculates the median lab value for each individual within a specified time window before
+#' the first purchase of a given drug. This function includes robust outlier removal using the
+#' Median Absolute Deviation (MAD) method and generates diagnostic plots.
+#' @param conn A `fg_data_connection` object.
+#' @param lablist A character vector of OMOP concept IDs.
+#' @param druglist A character vector of ATC drug codes.
+#' @param months_before The time window in months before the first drug purchase (default: 1).
+#' @param covariates Optional data frame for covariate data.
+#' @param covariate_cols Optional character vector of covariate column names.
+#' @param remove_outliers_mad_th The threshold for MAD-based outlier removal (default: 5).
+#' @param generate_plots Logical, whether to generate and save diagnostic plots (default: `FALSE`).
+#' @param output_dir The directory to save outputs (default: `"."`).
+#' @param output_file_prefix A prefix for output file names.
+#' @return A data frame with median lab values per individual, ready for GWAS analysis.
+#' @export
+get_median_pre_drug <- function(conn, lablist, druglist, months_before = 1,
+                                covariates = NULL, covariate_cols = NULL,
+                                remove_outliers_mad_th = 5,
+                                generate_plots = FALSE,
+                                output_dir = ".",
+                                output_file_prefix = "") {
+
+  # 1. Get measurements before drug purchase
+  measurements <- get_measurements_before_drug(
+    conn = conn,
+    lablist = lablist,
+    druglist = druglist,
+    months_before = months_before,
+    covariates = covariates,
+    covariate_cols = covariate_cols
+  )
+
+  # 2. MAD outlier removal
+  measurements_mad <- measurements
+  if (!is.null(remove_outliers_mad_th)) {
+    measurements_mad <- measurements %>%
+      filter(.data$MEASUREMENT_VALUE_HARMONIZED %in% filter_outliers_mad(.data$MEASUREMENT_VALUE_HARMONIZED, th = remove_outliers_mad_th))
+  }
+
+  # 3. Generate diagnostic plots if requested
+  if (generate_plots) {
+
+    # Distribution plot before and after MAD removal
+    data_before <- data.frame(value = measurements$MEASUREMENT_VALUE_HARMONIZED, group = "Before")
+    data_after <- data.frame(value = measurements_mad$MEASUREMENT_VALUE_HARMONIZED, group = "After")
+    plot_data <- rbind(data_before, data_after)
+
+    dist_plot <- gghistogram(plot_data, x = "value",
+      add = "mean", rug = TRUE,
+      color = "group", fill = "group",
+      palette = c("#00AFBB", "#E7B800"),
+      title = "Distribution Before and After MAD Outlier Removal",
+      xlab = "Lab Value",
+      ylab = "Density"
+    )
+    ggsave(file.path(output_dir, paste0(output_file_prefix, "_mad_distribution.png")), plot = dist_plot)
+
+    # Violin plot of median distribution between males and females
+    sex_col <- if("SEX_IMPUTED" %in% covariate_cols) "SEX_IMPUTED" else if("SEX" %in% covariate_cols) "SEX" else NULL
+
+    if (!is.null(sex_col)) {
+      # Prepare sex column for visualization
+      if (sex_col == "SEX_IMPUTED") {
+        measurements <- measurements %>%
+          mutate(SEX_VIS = case_when(
+            .data[[sex_col]] == 0 ~ "Male",
+            .data[[sex_col]] == 1 ~ "Female",
+            TRUE ~ "Unknown"
+          ))
+        measurements_mad <- measurements_mad %>%
+          mutate(SEX_VIS = case_when(
+            .data[[sex_col]] == 0 ~ "Male",
+            .data[[sex_col]] == 1 ~ "Female",
+            TRUE ~ "Unknown"
+          ))
+      } else {
+        measurements <- measurements %>%
+          mutate(SEX_VIS = case_when(
+            toupper(.data[[sex_col]]) %in% c("M", "MALE", "1") ~ "Male",
+            toupper(.data[[sex_col]]) %in% c("F", "FEMALE", "2") ~ "Female",
+            TRUE ~ "Unknown"
+          ))
+        measurements_mad <- measurements_mad %>%
+          mutate(SEX_VIS = case_when(
+            toupper(.data[[sex_col]]) %in% c("M", "MALE", "1") ~ "Male",
+            toupper(.data[[sex_col]]) %in% c("F", "FEMALE", "2") ~ "Female",
+            TRUE ~ "Unknown"
+          ))
+      }
+
+      pre_mad_sex <- measurements %>%
+        filter(.data$SEX_VIS != "Unknown") %>%
+        group_by(.data$FINNGENID, .data$SEX_VIS) %>%
+        summarise(median_val = median(.data$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE), .groups = "drop") %>%
+        mutate(group = "Before MAD")
+
+      post_mad_sex <- measurements_mad %>%
+        filter(.data$SEX_VIS != "Unknown") %>%
+        group_by(.data$FINNGENID, .data$SEX_VIS) %>%
+        summarise(median_val = median(.data$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE), .groups = "drop") %>%
+        mutate(group = "After MAD")
+
+      violin_data <- rbind(pre_mad_sex, post_mad_sex)
+
+      violin_plot <- ggviolin(violin_data, x = "group", y = "median_val", fill = "group",
+               palette = c("#FC4E07", "#00AFBB"),
+               add = "boxplot", add.params = list(fill = "white")) +
+        facet_wrap(~SEX_VIS) +
+        stat_compare_means(label = "p.signif") +
+        labs(title = "Median Lab Values by Sex (Before and After MAD)",
+             x = "Group", y = "Median Lab Value")
+
+      ggsave(file.path(output_dir, paste0(output_file_prefix, "_sex_violin.png")), plot = violin_plot)
+    }
+  }
+
+  # 4. Calculate median values
+  median_values <- measurements_mad %>%
+    group_by(FINNGENID) %>%
+    summarise(
+      median_value = median(.data$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  # 5. Format for output
+  output_df <- data.frame(
+    FID = median_values$FINNGENID,
+    IID = median_values$FINNGENID,
+    median_lab_value = median_values$median_value
+  )
+  colnames(output_df)[3] <- paste0(lablist[1], "_median")
+
+  # 6. Save to file
+  output_file <- file.path(output_dir, paste0(output_file_prefix, "_", lablist[1], "_DF13_median.tsv"))
+  write.table(output_df, file = output_file, sep = "\t", row.names = FALSE, quote = FALSE)
+
+  return(output_df)
 }

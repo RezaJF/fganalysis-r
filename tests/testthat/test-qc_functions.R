@@ -158,7 +158,7 @@ test_that("calculate_blup_slopes works with direct lab measurement input", {
   expect_true("3001308" %in% names(blup_results))
 
     # Check output file exists
-  output_file <- file.path(temp_dir, "3001308_DF13.tsv")
+  output_file <- file.path(temp_dir, "3001308_DF13_blup.tsv")
   expect_true(file.exists(output_file))
 
   # Read and check output

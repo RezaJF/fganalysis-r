@@ -175,7 +175,7 @@ This package provides a suite of functions for drug response analysis.
 ### Analysis
 - **`create_drug_response(conn, lablist, druglist, before_period, after_period, finngen_ids = NULL, remove_outliers_sd = NULL, covariates = NULL, covariate_cols = NULL)`**: The main analysis function. It calculates the drug response based on lab value changes before and after the first drug purchase. The `remove_outliers_sd` parameter can be used to remove outliers (specify number of SDs from mean, e.g., 1-6). It can now optionally join in subject-level covariates.
 - **`generate_response_summary(lab_measurements, before_period, after_period, summary_function = median)`**: A helper function to calculate the summary statistics for the response (e.g., median value before and after treatment). Called by `create_drug_response`. The `summary_function` parameter allows using different summary statistics (default is median).
-- **`get_measurements_before_drug(conn, lablist, druglist, months_before = 3, covariates = NULL, covariate_cols = NULL, remove_outliers_sd = NULL, winsorize_pct = NULL)`**: A standalone function to retrieve lab measurements, specifically designed for preparing data for BLUP analysis. It filters measurements to a specified window before a drug purchase for exposed individuals and includes all measurements for unexposed individuals.
+- **`get_measurements_before_drug(conn, lablist, druglist, months_before = 3, covariates = NULL, covariate_cols = NULL, remove_outliers_sd = NULL, winsorize_pct = NULL, range_sd_filter = NULL)`**: A standalone function to retrieve lab measurements, specifically designed for preparing data for BLUP analysis. It filters measurements to a specified window before a drug purchase for exposed individuals and includes all measurements for unexposed individuals.
   - `conn`: A `fg_data_connection` object.
   - `lablist`: A character vector of OMOP concept IDs for the labs of interest.
   - `druglist`: A character vector of ATC drug codes to define the "exposed" cohort.
@@ -187,7 +187,21 @@ This package provides a suite of functions for drug response analysis.
       - insorize_pct = 0.01 → Caps at 1st and 99th percentiles (1% on each tail)
       - winsorize_pct = 0.05 → Caps at 5th and 95th percentiles (5% on each tail)
       - winsorize_pct = 0.10 → Caps at 10th and 90th percentiles (10% on each tail)
-   Note: Only one outlier removal method (`remove_outliers_sd` or `winsorize_pct`) should be used at a time.
+  - `range_sd_filter`: An optional parameter for robust outlier removal. It takes a list with three named elements: `lower_bound`, `upper_bound`, and `nsd`. The function calculates the mean and standard deviation on the subset of data within the specified bounds and then removes all values from the original data that are more than `nsd` standard deviations from that calculated mean. This is useful for removing extreme outliers without them skewing the statistics used for the filtering itself. Example: `range_sd_filter = list(lower_bound = 50, upper_bound = 200, nsd = 4)`.
+   Note: Only one outlier removal method (`remove_outliers_sd`, `winsorize_pct`, or `range_sd_filter`) should be used at a time.
+
+- **`get_median_pre_drug(conn, lablist, druglist, months_before = 1, covariates = NULL, covariate_cols = NULL, remove_outliers_mad_th = 5, generate_plots = FALSE, output_dir = ".", output_file_prefix = "")`**: Calculates median lab values pre-medication with MAD-based outlier removal.
+  - Outputs tab-delimited files (`{output_file_prefix}_{OMOP_CONCEPT_ID}_DF13_median.tsv`) with columns: FID, IID, and {OMOP_CONCEPT_ID}_median
+  - Generates diagnostic plots when `generate_plots = TRUE`: histograms and sex-stratified violin plots
+  - Uses Median Absolute Deviation (MAD) for robust outlier removal with threshold parameter
+
+### Output File Naming Convention
+To avoid file conflicts when running both BLUP and median analyses:
+- **BLUP output files**: `{output_file_prefix}_{OMOP_CONCEPT_ID}_DF13_blup.tsv`
+- **BLUP model files**: `{output_file_prefix}_{OMOP_CONCEPT_ID}_blup_model.rds`
+- **BLUP description files**: `{output_file_prefix}_{OMOP_CONCEPT_ID}_DF13_blup_descriptionfile.tsv`
+- **Median output files**: `{output_file_prefix}_{OMOP_CONCEPT_ID}_DF13_median.tsv`
+- **Median description files**: `{output_file_prefix}_{OMOP_CONCEPT_ID}_DF13_median_descriptionfile.tsv`
 
 ### Summarization and Output
 - **`summarize_drug_response(drug_response, out_file_prefix)`**: Generates a PDF report with plots and tables summarizing the drug response analysis.
@@ -203,7 +217,7 @@ This package provides a suite of functions for drug response analysis.
   - If `include_sex = TRUE` (default), the function expects a SEX column in the drug_response object. If not found, it will raise an error with instructions to use `create_drug_response()` with appropriate covariates
   - If `include_sex = FALSE`, all subjects are coded as male (1) and sex is not included in the model
   - Includes robust convergence handling: scales age for numerical stability and falls back to simpler models if needed
-  - Outputs tab-delimited files (`{OMOP_CONCEPT_ID}_DF13.tsv`) with columns: FID, IID, and {OMOP_CONCEPT_ID}_slope
+  - Outputs tab-delimited files (`{OMOP_CONCEPT_ID}_DF13_blup.tsv`) with columns: FID, IID, and {OMOP_CONCEPT_ID}_slope
   - **NEW: Quality Control Features**:
     - When `calculate_qc = TRUE`: Calculates fixed-effect slopes for comparison with BLUPs and reports correlation
     - When `normalize_variance = TRUE`: Adds quantile-normalized variance column to variance output files
@@ -452,7 +466,7 @@ measurements_for_blup_sd <- get_measurements_before_drug(
   conn = conn,
   lablist = c("3001308"), # LDL
   druglist = c("C10AA"),  # Statins
-  months_before = 12,     # 1 year window before first purchase
+  months_before = 3,     # 3 month window before first purchase
   covariates = conn$cov_pheno,
   covariate_cols = c("SEX"),
   remove_outliers_sd = 4  # Remove values > 4 SD from the mean
@@ -463,10 +477,21 @@ measurements_before_drug_purchase <- get_measurements_before_drug(
   conn = conn,
   lablist = c("3001308"),
   druglist = c("C10AA"),
-  months_before = 12,
+  months_before = 3,
   covariates = conn$cov_pheno,
   covariate_cols = c("SEX"),
   winsorize_pct = 0.05 # Cap values at the 5th and 95th percentiles
+)
+
+# NEW Example 3: Using range-based SD filter for robust outlier removal
+measurements_for_blup_ranged <- get_measurements_before_drug(
+  conn = conn,
+  lablist = c("3001308"),
+  druglist = c("C10AA"),
+  months_before = 3,
+  covariates = conn$cov_pheno,
+  covariate_cols = c("SEX"),
+  range_sd_filter = list(lower_bound = 1, upper_bound = 8, nsd = 4)
 )
 
 # The resulting dataframe can be passed directly to calculate_blup_slopes()

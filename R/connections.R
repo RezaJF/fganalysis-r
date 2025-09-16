@@ -31,7 +31,7 @@ fg_data_connection <- function(connections) {
     if (!all(c("pheno", "labs") %in% names(connections))) {
         stop("Connections list must contain 'pheno' and 'labs'")
     }
-    ## do further checks on the connections as needed. 
+    ## do further checks on the connections as needed.
     class(connections) <- "fg_data_connection"
     return(connections)
 }
@@ -53,18 +53,39 @@ call_connect <- function(conf) {
     req_tags <- c("path", "type")
     if (!all(req_tags %in% names(conf))) {
         stop(paste("Configuration must contain these tag [", paste(req_tags,collapse=","),"]"))
-    }    
+    }
 
     path <- conf$path
     typestring <- conf$type
 
     if (typestring == "parquet") {
-        dat <- (duckdbfs::open_dataset(path, format="parquet"))
+        # Use duckdb directly to avoid extension loading issues
+        dat <- tryCatch({
+            # Try duckdbfs first with disabled extensions
+            options(duckdb.allow_unsigned_extensions = FALSE)
+            duckdbfs::open_dataset(path, format="parquet")
+        }, error = function(e) {
+            # Fallback to direct duckdb connection if duckdbfs fails
+            message("duckdbfs failed, using direct duckdb connection")
+            conn <- dbConnect(duckdb::duckdb())
+            tbl(conn, paste0("read_parquet('", path, "')"))
+        })
     } else if (typestring == "parquet-hive") {
-        dat <- (duckdbfs::open_dataset(path, format="parquet", hive_style=TRUE))
-    } else if (typestring == "tsv") 
+        # Use duckdb directly to avoid extension loading issues
+        dat <- tryCatch({
+            # Try duckdbfs first with disabled extensions
+            options(duckdb.allow_unsigned_extensions = FALSE)
+            duckdbfs::open_dataset(path, format="parquet", hive_style=TRUE)
+        }, error = function(e) {
+            # Fallback to direct duckdb connection if duckdbfs fails
+            message("duckdbfs failed, using direct duckdb connection for hive-style parquet")
+            conn <- dbConnect(duckdb::duckdb())
+            # Hive-style parquet with one level of partitioning (SOURCE=*)
+            tbl(conn, paste0("read_parquet('", path, "/*/*.parquet', hive_partitioning=true)"))
+        })
+    } else if (typestring == "tsv")
     {
-        dat <- fread(path, sep="\t") 
+        dat <- fread(path, sep="\t")
     } else {
         stop(paste("Unsupported connection type given in configuration file:", typestring,
                    ". Supported types are: parquet, parquet-hive, tsv"))
@@ -79,7 +100,7 @@ call_connect <- function(conf) {
             column <- recoding$column
             function_name <- recoding[["function"]]
             print(function_name)
-            
+
             dat[[column]] <- do.call(function_name, list(dat[[column]]))
         }
     }
@@ -90,7 +111,7 @@ call_connect <- function(conf) {
 #' @param path_to_conf Path to the configuration file (JSON format)
 #' @return A fg.data.connection object containing the connections to data
 #' @export
-connect_fgdata <-  function(path_to_conf) { 
+connect_fgdata <-  function(path_to_conf) {
     json_data <- rjson::fromJSON(file = path_to_conf)
     req_confs <- c("pheno", "labs")
     connections <- list()

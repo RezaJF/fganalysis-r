@@ -338,21 +338,14 @@ calculate_blup_slopes <- function(data, output_dir = ".",
       match_idx <- match(blup_slopes$FINNGENID, output_df$FID)
       output_df[[slope_col_name]][match_idx] <- blup_slopes$slope
 
-      # Save to file
+      # Define file paths (but don't save yet - need to add QC columns first if requested)
       file_base_name <- if (!is.null(output_file_prefix)) paste0(output_file_prefix, "_", concept_id) else as.character(concept_id)
-      output_file <- file.path(output_dir, paste0(file_base_name, "_DF13.tsv"))
-      write.table(output_df,
-                  file = output_file,
-                  sep = "\t",
-                  row.names = FALSE,
-                  quote = FALSE)
-
-      cat(paste0("Saved results to: ", output_file, "\n"))
+      output_file <- file.path(output_dir, paste0(file_base_name, "_DF13_blup.tsv"))
 
       # Save model if requested
       model_file <- NULL
       if (save_model) {
-        model_file <- file.path(output_dir, paste0(file_base_name, "_model.rds"))
+        model_file <- file.path(output_dir, paste0(file_base_name, "_blup_model.rds"))
         saveRDS(lmm_model, file = model_file)
         cat(paste0("Saved model to: ", model_file, "\n"))
       }
@@ -433,6 +426,14 @@ calculate_blup_slopes <- function(data, output_dir = ".",
           warning(paste0("Insufficient data for correlation analysis for OMOP_CONCEPT_ID: ", concept_id))
         }
       }
+
+      # Save the output file now that all columns (including QC if requested) have been added
+      write.table(output_df,
+                  file = output_file,
+                  sep = "\t",
+                  row.names = FALSE,
+                  quote = FALSE)
+      cat(paste0("Saved results to: ", output_file, "\n"))
 
       # Store results
       blup_results[[as.character(concept_id)]] <- list(

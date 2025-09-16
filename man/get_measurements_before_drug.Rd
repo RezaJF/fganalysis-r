@@ -8,11 +8,12 @@ get_measurements_before_drug(
   conn,
   lablist,
   druglist,
-  months_before = 3,
+  months_before,
   covariates = NULL,
   covariate_cols = NULL,
   remove_outliers_sd = NULL,
-  winsorize_pct = NULL
+  winsorize_pct = NULL,
+  range_sd_filter = NULL
 )
 }
 \arguments{
@@ -35,6 +36,9 @@ to use for outlier removal. Values outside `mean ± sd * remove_outliers_sd` wil
 \item{winsorize_pct}{An optional numeric value between 0 and 0.5 for Winsorizing the lab values.
 Represents the percentage to winsorize on each tail. For example, 0.05 (5%) will cap values
 below the 5th percentile and above the 95th percentile.}
+
+\item{range_sd_filter}{An optional list with `lower_bound`, `upper_bound`, and `nsd` for
+range-based standard deviation filtering.}
 }
 \value{
 A data frame of lab measurements with an `n_measurements` column, compatible with `calculate_blup_slopes`.

@@ -161,7 +161,8 @@ test_that("calculate_blup_slopes handles insufficient data for correlation", {
         EVENT_AGE = c(20, 21),
         MEASUREMENT_VALUE_HARMONIZED = c(1, 2)
       ),
-      plot_blup_correlation = TRUE
+      plot_blup_correlation = TRUE,
+      include_sex = FALSE
     ),
     "Skipping analysis"
   )
