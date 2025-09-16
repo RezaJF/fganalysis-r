@@ -10,6 +10,7 @@ create_drug_response(
   druglist,
   before_period,
   after_period,
+  filter_min_max = c(-Inf, Inf),
   finngen_ids = NULL
 )
 }
@@ -23,6 +24,8 @@ create_drug_response(
 \item{before_period}{vector with two elements, start and end of the before period}
 
 \item{after_period}{vector with two elements, start and end of the after period}
+
+\item{filter_min_max}{vector of length 2, min and max values to filter lab measurements (default c(-Inf, Inf))}
 
 \item{finngen_ids}{vector of FINNGENIDs to filter the data}
 }
