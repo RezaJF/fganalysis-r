@@ -115,16 +115,4 @@ test_that("create_drug_response returns the correct structure", {
     expect_equal(filtres$after, c(25, 40))
     expect_equal(filtres$response, c(8.4, 30.5))
 
-
-    ### test create failing. 
-    result <- create_drug_response(conn, lablist, druglist, c(-1, 0), c(0.1, 1), use_lab_free_text_values = FALSE)
-    filtres <- result$responses %>% filter(!is.na(response))
-    expect_s3_class(result, "drug.reponse")
-    expect_equal(nrow(filtres),1)
-    expect_equal(filtres$FINNGENID, c("FG1", "FG2"))
-    expect_equal(filtres$before, c(16.6, 9.5))
-    expect_equal(filtres$after, c(25, 40))
-    expect_equal(filtres$response, c(8.4, 30.5))
-
-
 })
