@@ -2,4 +2,4 @@
 library(testthat)
 library(fganalysis)
 
-test_check("fganalysis")
+test_check("fganalysis-r")

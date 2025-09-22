@@ -28,6 +28,10 @@
     "long_anthropometric": {
         "path": "/mnt/nfs/R13/finngen_R13_hilmo_avohilmo_extended_1.0_dedup_fixbp.parquet",
         "type": "parquet"
+    },
+        "drug_events": {
+        "path": "/mnt/nfs/R13/finngen_R13_drug_events_2.0.simple.parquet",
+        "type": "parquet"
     }
 
 }

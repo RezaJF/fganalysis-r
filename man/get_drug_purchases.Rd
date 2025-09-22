@@ -8,8 +8,7 @@ get_drug_purchases(
   conn,
   druglist,
   finngen_ids = NULL,
-  return_cols = c("FINNGENID", "EVENT_AGE", "APPROX_EVENT_DAY", ATC = "CODE1", REIMB_CODE
-    = "CODE2", VNR = "CODE3", N_PACKS = "CODE4"),
+  use_only_reimbursement = FALSE,
   lazy = FALSE
 )
 }
@@ -20,7 +19,7 @@ get_drug_purchases(
 
 \item{finngen_ids}{vector of FINNGENIDs to filter the data. leave empty to get all}
 
-\item{return_cols}{vector of column names to return}
+\item{use_only_reimbursement}{logical, if TRUE, use only reimbursement data (default FALSE) and combine reimbursement and delivery data if available in conn}
 
 \item{lazy}{logical, if TRUE, return a lazy tbl object}
 }

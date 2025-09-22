@@ -5,10 +5,6 @@ duckdb -c "COPY (select * from read_csv('finngen_R13_service_sector_detailed_lon
 duckdb -c 'COPY (select * from read_parquet("finngen_R13_kanta_lab_1.0.parquet")) to "finngen_R13_kanta_lab_1.0.parquet" (format PARQUET)'
 
 
-### this crazy wide table runs out of memory.  could try setting datatypes to tinynt etc. or then transform to long format.
-duckdb -c "SET preserve_insertion_order = false;SET threads TO 3; COPY (select * from read_csv('finngen_R13_endpoint_1.0.txt.gz',delim='\t', nullstr="NA", auto_type_candidates=['int','varchar']) ) to 'finngen_R13_endpoint_1.0.txt.gz.parquet' (FORMAT parquet)"
-
-## 
 duckdb -c "COPY (select * from read_csv('finngen_R13_minimum_extended_1.0.txt.gz',delim='\t') ) to 'finngen_R13_minimum_extended_1.0.parquet' (FORMAT parquet)"
 
 
@@ -18,7 +14,7 @@ duckdb -c "COPY (select * from read_csv('finngen_R13_hilmo_avohilmo_extended_1.0
 ' (FORMAT parquet)"
 
 
+scripts/process_drugs.py finngen_R13_drug_events_2.0.csv finngen_R13_drug_events_2.0.simple.csv
 
-/mnt/nfs/R13/finngen_R13_hilmo_avohilmo_extended_1.0_dedup_fixbp.txt.gz
-
+duckdb -c "COPY (select * from read_csv('finngen_R13_drug_events_2.0.simple.csv.gz',delim='\t') order by ATC) to 'finngen_R13_drug_events_2.0.simple.parquet' (FORMAT parquet)"
 
