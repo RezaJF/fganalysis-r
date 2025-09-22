@@ -214,7 +214,6 @@ summarize_drug_response <- function(drug_response, out_file_prefix) {
         theme_bw() +
         labs(x = "Response%", y = "Count") +
         ggtitle("Distribution of % drug response"))
-
     
     for( drug in uniq_drugs){
         labs_sub <- responses %>% filter( .data$first_drug == drug)
