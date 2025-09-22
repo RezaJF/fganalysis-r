@@ -87,7 +87,7 @@ create_drug_response <- function(
     lab_response <- generate_response_summary(lab_measurements, before_period, after_period,
         summary_function = summary_function
     )
-    print(paste0("Number of individuals with response data: ", nrow(lab_response)))
+    print(paste0("Number of individuals with response data: ", nrow(lab_response %>% filter(!is.na(.data$response)))))
 
     return(drug.response(
         responses = lab_response, lab_measurements = lab_measurements,
@@ -108,7 +108,7 @@ quant_text <- function(vector) {
 #' @export
 summarize_drug_response <- function(drug_response, out_file_prefix) {
     labs <- drug_response$all_measurements %>% filter(!is.na(.data$VALUE))
-    responses <- drug_response$responses
+    responses <- drug_response$responses %>% filter(!is.na(.data$response))
     drugs <- drug_response$all_drug_purchases
 
     pdf(paste0(out_file_prefix, ".pdf"), width = 10, height = 6)
@@ -119,7 +119,8 @@ summarize_drug_response <- function(drug_response, out_file_prefix) {
     inds_with_drugs <- length(unique(drugs$FINNGENID))
     n_drugs_meas <- nrow(drugs)
 
-    inds_in_analysis <- nrow(responses)
+    inds_in_analysis <- nrow(responses )
+
     n_range_before <- quant_text(responses$n_before)
     n_range_after <- quant_text(responses$n_before)
 
@@ -135,7 +136,6 @@ summarize_drug_response <- function(drug_response, out_file_prefix) {
     ), rows = NULL))
 
 
-    responses <- responses %>% filter(!is.na(response))
     per_drug <- responses %>%
         group_by(.data$first_drug) %>%
         summarise(
@@ -282,7 +282,6 @@ generate_response_summary <- function(lab_measurements, before_period, after_per
             response = ifelse(!is.na(.data$after) & !is.na(.data$before), .data$after - .data$before, NA),
             response_percent = response/ .data$before * 100
         )
-    # %>% dplyr::filter(!is.na(.data$response))
 
     return(lab_response)
 }
@@ -302,9 +301,11 @@ get_lab_measurements <- function(all_labs, lablist, require_values = TRUE, use_f
                                  finngen_ids = NULL, lazy = FALSE) {
 
     if(! use_freetext_values){
+        print("Using only MEASUREMENT_VALUE_HARMONIZED column for lab values and not combining from reported values and extracted from free text")
         lab_value_column <- "MEASUREMENT_VALUE_HARMONIZED"
     }
     else {
+        print("Using MEASUREMENT_VALUE_MERGED column for lab values, which combines reported values and those extracted from free text")
         lab_value_column <- "MEASUREMENT_VALUE_MERGED"
     }
 

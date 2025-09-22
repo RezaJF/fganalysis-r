@@ -4,7 +4,7 @@
         "type": "parquet-hive"
     },
     "labs": {
-        "path": "/finngen/shared_nfs/R13/phenos/finngen_R13_kanta_lab_1.0.parquet",
+        "path": "/finngen/shared_nfs/R13/phenos/finngen_R13_kanta_lab_2.0.parquet",
         "type": "parquet"
     },
     "minimum": {
@@ -33,3 +33,4 @@
         "type": "parquet"
     }
 }
+
