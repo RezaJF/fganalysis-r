@@ -37,14 +37,11 @@ drug.response <- function(responses, lab_measurements,
 #' @param after_period A numeric vector of length 2 defining the after period (e.g., c(0.1, 1) for 0.1 to 1 year after drug)
 #' @param finngen_ids Optional character vector of FINNGENIDs to restrict analysis
 #' @param remove_outliers_sd Optional numeric value (1-6) to remove outliers based on standard deviations
-#' @param covariates Optional data frame or lazy table containing covariate data
-#' @param covariate_cols Optional character vector of column names to join from the covariates table
 #' @return drug.response object
 #' @export
 create_drug_response <- function(conn, lablist, druglist,
                                  before_period, after_period,
-                                 finngen_ids = NULL, remove_outliers_sd = NULL,
-                                 covariates = NULL, covariate_cols = NULL) {
+                                 finngen_ids = NULL, remove_outliers_sd = NULL) {
 
   # Validate all input parameters immediately
   if (!inherits(conn, "fg_data_connection")) {
@@ -83,12 +80,6 @@ create_drug_response <- function(conn, lablist, druglist,
     stop("finngen_ids must be a non-empty character vector or NULL")
   }
 
-  if (!is.null(covariates) && !is.null(covariate_cols)) {
-    if (!is.character(covariate_cols) || length(covariate_cols) == 0) {
-      stop("covariate_cols must be a non-empty character vector or NULL")
-    }
-  }
-
   # Extract data from connection object
   kanta <- conn$labs
   phenos <- conn$pheno
@@ -97,9 +88,7 @@ create_drug_response <- function(conn, lablist, druglist,
   lab_measurements <- get_lab_measurements(all_labs = kanta,
                                            lablist = lablist,
                                            require_values = TRUE,
-                                           finngen_ids = finngen_ids,
-                                           covariates = covariates,
-                                           covariate_cols = covariate_cols)
+                                           finngen_ids = finngen_ids)
 
   if (!is.null(remove_outliers_sd)) {
 
@@ -132,39 +121,6 @@ create_drug_response <- function(conn, lablist, druglist,
 
   lab_response <- generate_response_summary(lab_measurements, before_period, after_period)
   cat("Number of individuals with response data: ", nrow(lab_response), "\n")
-
-  # Add covariates if provided
-  if (!is.null(covariates) && !is.null(covariate_cols)) {
-    print(paste("Adding covariates:", paste(covariate_cols, collapse = ", ")))
-
-    # Ensure FINNGENID is in the columns for the join
-    cols_to_select <- unique(c("FINNGENID", covariate_cols))
-
-    # Check that all requested columns exist in the covariates dataframe
-    missing_cols <- setdiff(cols_to_select, colnames(covariates))
-    if (length(missing_cols) > 0) {
-      stop(paste("The following `covariate_cols` are not in the `covariates` dataframe:",
-                 paste(missing_cols, collapse = ", ")))
-    }
-
-    # Select the requested columns and ensure one row per FINNGENID
-    # Collect the data if it's a lazy table
-    cov_data_to_join <- covariates %>%
-      select(all_of(cols_to_select)) %>%
-      distinct(.data$FINNGENID, .keep_all = TRUE)
-
-    # If covariates is a lazy table (database connection), collect it
-    if (inherits(covariates, "tbl_lazy") || inherits(covariates, "tbl_sql")) {
-      cov_data_to_join <- dplyr::collect(cov_data_to_join)
-    }
-
-    # Join with the final response summary data frame
-    lab_response <- lab_response %>%
-      left_join(cov_data_to_join, by = "FINNGENID")
-
-    # The covariates are already joined to lab_measurements inside get_lab_measurements,
-    # so we don't need to join them again here. This avoids duplicated columns.
-  }
 
   drug.response(responses = lab_response, lab_measurements = lab_measurements,
                 drug_purchases = drug_purchases, before_period = before_period, after_period = after_period)
@@ -217,8 +173,6 @@ generate_response_summary <- function(lab_measurements, before_period, after_per
 #' @param druglist A character vector of ATC drug codes.
 #' @param months_before A numeric value specifying the time window in months before the first drug
 #' purchase to include lab measurements. Defaults to 3.
-#' @param covariates An optional data frame or lazy table containing covariate data.
-#' @param covariate_cols A character vector of column names to join from the `covariates` table.
 #' @param remove_outliers_sd An optional numeric value specifying the number of standard deviations
 #' to use for outlier removal. Values outside `mean ± sd * remove_outliers_sd` will be removed.
 #' @param winsorize_pct An optional numeric value between 0 and 0.5 for Winsorizing the lab values.
@@ -229,7 +183,6 @@ generate_response_summary <- function(lab_measurements, before_period, after_per
 #' @return A data frame of lab measurements with an `n_measurements` column, compatible with `calculate_blup_slopes`.
 #' @export
 get_measurements_before_drug <- function(conn, lablist, druglist, months_before,
-                                         covariates = NULL, covariate_cols = NULL,
                                          remove_outliers_sd = NULL, winsorize_pct = NULL,
                                          range_sd_filter = NULL) {
 
@@ -241,8 +194,7 @@ get_measurements_before_drug <- function(conn, lablist, druglist, months_before,
   }
 
   # 1. Get all relevant lab measurements and drug purchases
-  lab_measurements <- get_lab_measurements(conn$labs, lablist, require_values = TRUE,
-                                           covariates = covariates, covariate_cols = covariate_cols)
+  lab_measurements <- get_lab_measurements(conn$labs, lablist, require_values = TRUE)
 
   first_purchases <- get_first_purchase(conn$pheno, druglist) %>%
     select(FINNGENID, first_drug_age = EVENT_AGE)
@@ -324,8 +276,6 @@ get_measurements_before_drug <- function(conn, lablist, druglist, months_before,
 #' @param lablist A character vector of OMOP concept IDs.
 #' @param druglist A character vector of ATC drug codes.
 #' @param months_before The time window in months before the first drug purchase (default: 1).
-#' @param covariates Optional data frame for covariate data.
-#' @param covariate_cols Optional character vector of covariate column names.
 #' @param remove_outliers_mad_th The threshold for MAD-based outlier removal (default: 5).
 #' @param generate_plots Logical, whether to generate and save diagnostic plots (default: `FALSE`).
 #' @param output_dir The directory to save outputs (default: `"."`).
@@ -333,7 +283,6 @@ get_measurements_before_drug <- function(conn, lablist, druglist, months_before,
 #' @return A data frame with median lab values per individual, ready for GWAS analysis.
 #' @export
 get_median_pre_drug <- function(conn, lablist, druglist, months_before = 1,
-                                covariates = NULL, covariate_cols = NULL,
                                 remove_outliers_mad_th = 5,
                                 generate_plots = FALSE,
                                 output_dir = ".",
@@ -344,9 +293,7 @@ get_median_pre_drug <- function(conn, lablist, druglist, months_before = 1,
     conn = conn,
     lablist = lablist,
     druglist = druglist,
-    months_before = months_before,
-    covariates = covariates,
-    covariate_cols = covariate_cols
+    months_before = months_before
   )
 
   # 2. MAD outlier removal

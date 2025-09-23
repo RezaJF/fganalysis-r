@@ -192,25 +192,35 @@ This package provides a suite of functions for drug response analysis.
 - **`create_mock_connection(pheno_data, labs_data, ...)`**: Creates a mock connection object using data frames instead of database connections. Useful for testing, development, and working with small datasets that can fit in memory.
 
 ### Data Retrieval
-- **`get_lab_measurements(all_labs, lablist, require_values = TRUE, return_cols = c("FINNGENID","OMOP_CONCEPT_ID", "EVENT_AGE", "MEASUREMENT_VALUE_HARMONIZED"), finngen_ids = NULL, lazy = FALSE, covariates = NULL, covariate_cols = NULL)`**: Extracts lab measurements for specified OMOP concept IDs.
+- **`get_lab_measurements(all_labs, lablist, require_values = TRUE, return_cols = c("FINNGENID","OMOP_CONCEPT_ID", "EVENT_AGE", "MEASUREMENT_VALUE_HARMONIZED"), finngen_ids = NULL, lazy = FALSE)`**: Extracts lab measurements for specified OMOP concept IDs.
   - `require_values`: If TRUE, only returns rows with non-missing MEASUREMENT_VALUE_HARMONIZED
   - `return_cols`: Columns to return from the lab data
   - `finngen_ids`: Optional vector of FINNGENIDs to filter the data
   - `lazy`: If TRUE, returns a lazy tbl object instead of collecting data
-  - **NEW**: Can now optionally join covariates (e.g., SEX, AGE_AT_DEATH_OR_END_OF_FOLLOWUP) from a separate table via `covariates` and `covariate_cols` parameters. Note: Covariate columns are added through a left join operation and don't need to exist in the lab data table
 - **`get_drug_purchases(all_phenos, druglist, finngen_ids = NULL, return_cols = c("FINNGENID","EVENT_AGE", ATC="CODE1", REIMB_CODE="CODE2", VNR="CODE3", N_PACKS="CODE4"), lazy = FALSE)`**: Extracts drug purchases for specified ATC codes. The matching is done on the beginning of the ATC code.
 - **`get_first_purchase(all_phenos, druglist, finngen_ids = NULL, return_cols = c("FINNGENID","EVENT_AGE","CODE1"), lazy = FALSE)`**: A wrapper around `get_drug_purchases` to get only the first purchase event for each individual.
 
+### Covariate Handling
+The package follows the **single responsibility principle** for covariate handling. Core functions focus on their primary purpose, while covariate joining is handled by dedicated helper functions.
+
+- **`join_covariates_to_labs(lab_data, covariates, covariate_cols)`**: Helper function to join covariate data to lab measurements data frame. This function handles the common pattern of adding covariates like sex, age, etc. to lab data.
+- **`join_covariates(data, covariates, covariate_cols)`**: Generic helper function to join covariate data to any data frame with FINNGENID column.
+
+**Benefits of this approach:**
+- **Single Responsibility**: Each function has one clear purpose
+- **Composability**: Functions can be combined in different ways
+- **Flexibility**: Users can choose when/how to join covariates
+- **Testability**: Easier to test individual components
+- **Maintainability**: Less complex functions are easier to maintain
+
 ### Analysis
-- **`create_drug_response(conn, lablist, druglist, before_period, after_period, finngen_ids = NULL, remove_outliers_sd = NULL, covariates = NULL, covariate_cols = NULL)`**: The main analysis function. It calculates the drug response based on lab value changes before and after the first drug purchase. The `remove_outliers_sd` parameter can be used to remove outliers (specify number of SDs from mean, e.g., 1-6). It can now optionally join in subject-level covariates.
+- **`create_drug_response(conn, lablist, druglist, before_period, after_period, finngen_ids = NULL, remove_outliers_sd = NULL)`**: The main analysis function. It calculates the drug response based on lab value changes before and after the first drug purchase. The `remove_outliers_sd` parameter can be used to remove outliers (specify number of SDs from mean, e.g., 1-6).
 - **`generate_response_summary(lab_measurements, before_period, after_period, summary_function = median)`**: A helper function to calculate the summary statistics for the response (e.g., median value before and after treatment). Called by `create_drug_response`. The `summary_function` parameter allows using different summary statistics (default is median).
-- **`get_measurements_before_drug(conn, lablist, druglist, months_before = 3, covariates = NULL, covariate_cols = NULL, remove_outliers_sd = NULL, winsorize_pct = NULL, range_sd_filter = NULL)`**: A standalone function to retrieve lab measurements, specifically designed for preparing data for BLUP analysis. It filters measurements to a specified window before a drug purchase for exposed individuals and includes all measurements for unexposed individuals.
+- **`get_measurements_before_drug(conn, lablist, druglist, months_before = 3, remove_outliers_sd = NULL, winsorize_pct = NULL, range_sd_filter = NULL)`**: A standalone function to retrieve lab measurements, specifically designed for preparing data for BLUP analysis. It filters measurements to a specified window before a drug purchase for exposed individuals and includes all measurements for unexposed individuals.
   - `conn`: A `fg_data_connection` object.
   - `lablist`: A character vector of OMOP concept IDs for the labs of interest.
   - `druglist`: A character vector of ATC drug codes to define the "exposed" cohort.
   - `months_before`: The time window in months before the first drug purchase to include lab measurements (default is 3).
-  - `covariates`: An optional data frame or lazy table containing covariate data (e.g., `conn$cov_pheno`).
-  - `covariate_cols`: A character vector of column names to join from the `covariates` table (e.g., `c("SEX")`).
   - `remove_outliers_sd`: Optional parameter to remove outliers based on standard deviation (e.g., `remove_outliers_sd = 4`).
   - `winsorize_pct`: Optional parameter to cap extreme values using Winsorization. Values between 0 and 0.5 specify the percentage to winsorize on each tail (e.g., `winsorize_pct = 0.05` caps values below the 5th percentile and above the 95th percentile). This is a percentage to winsorise on each tail which is equivalent of (1- `winsorize_pct`) proportion to keep:
       - insorize_pct = 0.01 → Caps at 1st and 99th percentiles (1% on each tail)
@@ -219,7 +229,7 @@ This package provides a suite of functions for drug response analysis.
   - `range_sd_filter`: An optional parameter for robust outlier removal. It takes a list with three named elements: `lower_bound`, `upper_bound`, and `nsd`. The function calculates the mean and standard deviation on the subset of data within the specified bounds and then removes all values from the original data that are more than `nsd` standard deviations from that calculated mean. This is useful for removing extreme outliers without them skewing the statistics used for the filtering itself. Example: `range_sd_filter = list(lower_bound = 50, upper_bound = 200, nsd = 4)`.
    Note: Only one outlier removal method (`remove_outliers_sd`, `winsorize_pct`, or `range_sd_filter`) should be used at a time.
 
-- **`get_median_pre_drug(conn, lablist, druglist, months_before = 1, covariates = NULL, covariate_cols = NULL, remove_outliers_mad_th = 5, generate_plots = FALSE, output_dir = ".", output_file_prefix = "")`**: Calculates median lab values pre-medication with MAD-based outlier removal.
+- **`get_median_pre_drug(conn, lablist, druglist, months_before = 1, remove_outliers_mad_th = 5, generate_plots = FALSE, output_dir = ".", output_file_prefix = "")`**: Calculates median lab values pre-medication with MAD-based outlier removal.
   - Outputs tab-delimited files (`{output_file_prefix}_{OMOP_CONCEPT_ID}_DF13_median.tsv`) with columns: FID, IID, and {OMOP_CONCEPT_ID}_median
   - Generates diagnostic plots when `generate_plots = TRUE`: histograms and sex-stratified violin plots
   - Uses Median Absolute Deviation (MAD) for robust outlier removal with threshold parameter
@@ -388,7 +398,6 @@ after_window <- c(1/12, 1)   # 1 month to 1 year after drug purchase
 #    - Get the relevant lab measurements and drug purchases.
 #    - Find the first drug purchase for each individual.
 #    - Calculate the difference in median lab values between the 'after' and 'before' periods.
-#    - Optionally, join in specified covariates.
 response_data <- create_drug_response(
   conn = conn,
   lablist = lab_id,
@@ -396,9 +405,19 @@ response_data <- create_drug_response(
   before_period = before_window,
   after_period = after_window
   # Optionally remove outliers: remove_outliers_sd = 3
-  # Optionally add covariates:
-  # covariates = conn$cov_pheno,
-  # covariate_cols = c("SEX", "AGE_AT_DEATH_OR_END_OF_FOLLOWUP")
+)
+
+# Add covariates using helper functions (if needed for BLUP analysis)
+response_data$responses <- join_covariates(
+  data = response_data$responses,
+  covariates = conn$cov_pheno,
+  covariate_cols = c("SEX", "AGE_AT_DEATH_OR_END_OF_FOLLOWUP")
+)
+
+response_data$all_measurements <- join_covariates_to_labs(
+  lab_data = response_data$all_measurements,
+  covariates = conn$cov_pheno,
+  covariate_cols = c("SEX", "AGE_AT_DEATH_OR_END_OF_FOLLOWUP")
 )
 
 # 5. Summarize the results
@@ -496,9 +515,14 @@ measurements_for_blup_sd <- get_measurements_before_drug(
   lablist = c("3001308"), # LDL
   druglist = c("C10AA"),  # Statins
   months_before = 3,     # 3 month window before first purchase
-  covariates = conn$cov_pheno,
-  covariate_cols = c("SEX"),
   remove_outliers_sd = 4  # Remove values > 4 SD from the mean
+)
+
+# Add covariates using helper function
+measurements_for_blup_sd <- join_covariates_to_labs(
+  lab_data = measurements_for_blup_sd,
+  covariates = conn$cov_pheno,
+  covariate_cols = c("SEX")
 )
 
 # Example 2: Using Winsorizing for outlier removal
@@ -507,9 +531,14 @@ measurements_before_drug_purchase <- get_measurements_before_drug(
   lablist = c("3001308"),
   druglist = c("C10AA"),
   months_before = 3,
-  covariates = conn$cov_pheno,
-  covariate_cols = c("SEX"),
   winsorize_pct = 0.05 # Cap values at the 5th and 95th percentiles
+)
+
+# Add covariates using helper function
+measurements_before_drug_purchase <- join_covariates_to_labs(
+  lab_data = measurements_before_drug_purchase,
+  covariates = conn$cov_pheno,
+  covariate_cols = c("SEX")
 )
 
 # NEW Example 3: Using range-based SD filter for robust outlier removal
@@ -518,9 +547,14 @@ measurements_for_blup_ranged <- get_measurements_before_drug(
   lablist = c("3001308"),
   druglist = c("C10AA"),
   months_before = 3,
-  covariates = conn$cov_pheno,
-  covariate_cols = c("SEX"),
   range_sd_filter = list(lower_bound = 1, upper_bound = 8, nsd = 4)
+)
+
+# Add covariates using helper function
+measurements_for_blup_ranged <- join_covariates_to_labs(
+  lab_data = measurements_for_blup_ranged,
+  covariates = conn$cov_pheno,
+  covariate_cols = c("SEX")
 )
 
 # The resulting dataframe can be passed directly to calculate_blup_slopes()

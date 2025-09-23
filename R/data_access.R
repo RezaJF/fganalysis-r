@@ -5,29 +5,15 @@
 #' @param return_cols vector of column names to return
 #' @param finngen_ids vector of FINNGENIDs to filter the data
 #' @param lazy logical, if TRUE, return a lazy tbl object
-#' @param covariates Optional data frame with covariate data (e.g., sex, age at death)
-#' @param covariate_cols Optional character vector of column names to add from the covariates data frame
 #' @return data frame with lab measurements
 #' @export
-#' @importFrom dplyr %>% filter select collect all_of left_join distinct mutate
+#' @importFrom dplyr %>% filter select collect all_of mutate
 #' @import stringr
 get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
                                  return_cols=c("FINNGENID","OMOP_CONCEPT_ID", "EVENT_AGE", "MEASUREMENT_VALUE_HARMONIZED"),
-                                 finngen_ids=NULL, lazy=FALSE,
-                                 covariates=NULL, covariate_cols=NULL) {
+                                 finngen_ids=NULL, lazy=FALSE) {
 
-  # Store the base columns from all_labs (without covariate columns)
-  # Covariate columns will be added later via the join
-  base_return_cols <- unique(c("OMOP_CONCEPT_ID", return_cols))
-
-  # Only select columns that exist in all_labs at this point
-  # Filter out any covariate_cols from base_return_cols if they were accidentally included
-  if (!is.null(covariate_cols)) {
-    base_return_cols <- setdiff(base_return_cols, covariate_cols)
-    # But ensure we keep the default return_cols
-    base_return_cols <- unique(c("OMOP_CONCEPT_ID", "FINNGENID", "EVENT_AGE", "MEASUREMENT_VALUE_HARMONIZED",
-                                  setdiff(return_cols, covariate_cols)))
-  }
+  return_cols <- unique(c("OMOP_CONCEPT_ID", return_cols))
 
   # Ensure robust matching regardless of column/vector types (character vs numeric)
   # The OMOP_CONCEPT_ID column may be stored as DECIMAL in the parquet file
@@ -39,7 +25,7 @@ get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
   # This ensures the comparison works regardless of the storage type
   labs <- all_labs %>%
     mutate(OMOP_CONCEPT_ID = as.character(.data$OMOP_CONCEPT_ID)) %>%
-    select(all_of(base_return_cols)) %>%
+    select(all_of(return_cols)) %>%
     dplyr::filter(.data$OMOP_CONCEPT_ID %in% lablist_chr)
 
   if (!is.null(finngen_ids)) {
@@ -47,30 +33,6 @@ get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
   }
   if (require_values) {
     labs <- labs %>% dplyr::filter(!is.na(.data$MEASUREMENT_VALUE_HARMONIZED))
-  }
-
-  # Add covariates if provided
-  if (!is.null(covariates) && !is.null(covariate_cols)) {
-    # Ensure FINNGENID is in the columns for the join
-    cols_to_select <- unique(c("FINNGENID", covariate_cols))
-
-    # Check that all requested columns exist in the covariates dataframe
-    missing_cols <- setdiff(cols_to_select, colnames(covariates))
-    if (length(missing_cols) > 0) {
-      stop(paste("The following `covariate_cols` are not in the `covariates` dataframe:",
-                 paste(missing_cols, collapse = ", ")))
-    }
-
-    # Select the requested columns and ensure one row per FINNGENID
-    cov_data_to_join <- covariates %>%
-      select(all_of(cols_to_select)) %>%
-      distinct(.data$FINNGENID, .keep_all = TRUE)
-
-    # Join covariates with lab measurements
-    # If labs is a lazy table (e.g., DuckDB), allow copying the RHS to the same src
-    copy_needed <- inherits(labs, "tbl_lazy") || inherits(labs, "tbl_sql")
-    labs <- labs %>%
-      left_join(cov_data_to_join, by = "FINNGENID", copy = copy_needed)
   }
 
   if (lazy) {
@@ -172,4 +134,108 @@ get_first_purchase <- function(all_phenos, druglist, finngen_ids=NULL,
   } else {
     dplyr::collect(first_purch)
   }
+}
+
+#' @title Join Covariates to Lab Measurements
+#' @description Helper function to join covariate data to lab measurements data frame.
+#' This function handles the common pattern of adding covariates like sex, age, etc. to lab data.
+#' @param lab_data Data frame with lab measurements (must contain FINNGENID column)
+#' @param covariates Data frame or lazy table containing covariate data
+#' @param covariate_cols Character vector of column names to join from the covariates table
+#' @return Data frame with lab measurements and joined covariates
+#' @export
+#' @examples
+#' # Join sex covariate to lab measurements
+#' lab_with_sex <- join_covariates_to_labs(
+#'   lab_data = lab_measurements,
+#'   covariates = conn$cov_pheno,
+#'   covariate_cols = c("SEX")
+#' )
+#'
+#' # Join multiple covariates
+#' lab_with_covariates <- join_covariates_to_labs(
+#'   lab_data = lab_measurements,
+#'   covariates = conn$cov_pheno,
+#'   covariate_cols = c("SEX", "AGE_AT_DEATH_OR_END_OF_FOLLOWUP")
+#' )
+join_covariates_to_labs <- function(lab_data, covariates, covariate_cols) {
+  if (is.null(covariates) || is.null(covariate_cols)) {
+    return(lab_data)
+  }
+
+  # Ensure FINNGENID is in the columns for the join
+  cols_to_select <- unique(c("FINNGENID", covariate_cols))
+
+  # Check that all requested columns exist in the covariates dataframe
+  missing_cols <- setdiff(cols_to_select, colnames(covariates))
+  if (length(missing_cols) > 0) {
+    stop(paste("The following `covariate_cols` are not in the `covariates` dataframe:",
+               paste(missing_cols, collapse = ", ")))
+  }
+
+  # Select the requested columns and ensure one row per FINNGENID
+  cov_data_to_join <- covariates %>%
+    select(all_of(cols_to_select)) %>%
+    distinct(.data$FINNGENID, .keep_all = TRUE)
+
+  # If covariates is a lazy table (database connection), collect it
+  if (inherits(covariates, "tbl_lazy") || inherits(covariates, "tbl_sql")) {
+    cov_data_to_join <- dplyr::collect(cov_data_to_join)
+  }
+
+  # Join covariates with lab measurements
+  # If lab_data is a lazy table (e.g., DuckDB), allow copying the RHS to the same src
+  copy_needed <- inherits(lab_data, "tbl_lazy") || inherits(lab_data, "tbl_sql")
+  result <- lab_data %>%
+    left_join(cov_data_to_join, by = "FINNGENID", copy = copy_needed)
+
+  return(result)
+}
+
+#' @title Join Covariates to Any Data Frame
+#' @description Generic helper function to join covariate data to any data frame with FINNGENID.
+#' @param data Data frame with FINNGENID column
+#' @param covariates Data frame or lazy table containing covariate data
+#' @param covariate_cols Character vector of column names to join from the covariates table
+#' @return Data frame with joined covariates
+#' @export
+#' @examples
+#' # Join covariates to drug response data
+#' response_with_covariates <- join_covariates(
+#'   data = drug_response$responses,
+#'   covariates = conn$cov_pheno,
+#'   covariate_cols = c("SEX", "AGE_AT_DEATH_OR_END_OF_FOLLOWUP")
+#' )
+join_covariates <- function(data, covariates, covariate_cols) {
+  if (is.null(covariates) || is.null(covariate_cols)) {
+    return(data)
+  }
+
+  # Ensure FINNGENID is in the columns for the join
+  cols_to_select <- unique(c("FINNGENID", covariate_cols))
+
+  # Check that all requested columns exist in the covariates dataframe
+  missing_cols <- setdiff(cols_to_select, colnames(covariates))
+  if (length(missing_cols) > 0) {
+    stop(paste("The following `covariate_cols` are not in the `covariates` dataframe:",
+               paste(missing_cols, collapse = ", ")))
+  }
+
+  # Select the requested columns and ensure one row per FINNGENID
+  cov_data_to_join <- covariates %>%
+    select(all_of(cols_to_select)) %>%
+    distinct(.data$FINNGENID, .keep_all = TRUE)
+
+  # If covariates is a lazy table (database connection), collect it
+  if (inherits(covariates, "tbl_lazy") || inherits(covariates, "tbl_sql")) {
+    cov_data_to_join <- dplyr::collect(cov_data_to_join)
+  }
+
+  # Join covariates with data
+  # If data is a lazy table (e.g., DuckDB), allow copying the RHS to the same src
+  copy_needed <- inherits(data, "tbl_lazy") || inherits(data, "tbl_sql")
+  result <- data %>%
+    left_join(cov_data_to_join, by = "FINNGENID", copy = copy_needed)
+
+  return(result)
 }

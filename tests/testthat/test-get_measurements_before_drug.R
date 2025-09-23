@@ -36,7 +36,12 @@ test_that("get_measurements_before_drug works as a standalone function", {
     conn,
     lablist = "3001308",
     druglist = "C10AA",
-    months_before = 3,
+    months_before = 3
+  )
+
+  # Add covariates using helper function
+  measurements <- join_covariates_to_labs(
+    lab_data = measurements,
     covariates = conn$cov_pheno,
     covariate_cols = "SEX"
   )

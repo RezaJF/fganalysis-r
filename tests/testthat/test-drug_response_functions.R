@@ -248,14 +248,26 @@ test_that("create_drug_response handles covariates correctly", {
     UNRELATED_COL = "data"
   )
 
-  # Test 1: Add covariates successfully
+  # Test 1: Create drug response and add covariates separately
   conn <- create_mock_connection(pheno_data = mock_phenos, labs_data = mock_labs)
   response_obj <- create_drug_response(
     conn = conn,
     lablist = "L1",
     druglist = "D1",
     before_period = c(0.5, 1.5),
-    after_period = c(-0.5, 0.5),
+    after_period = c(-0.5, 0.5)
+  )
+
+  # Add covariates to the response data
+  response_obj$responses <- join_covariates(
+    data = response_obj$responses,
+    covariates = mock_covariates,
+    covariate_cols = c("SEX", "AGE_AT_DEATH")
+  )
+
+  # Add covariates to the lab measurements
+  response_obj$all_measurements <- join_covariates_to_labs(
+    lab_data = response_obj$all_measurements,
     covariates = mock_covariates,
     covariate_cols = c("SEX", "AGE_AT_DEATH")
   )
@@ -277,14 +289,18 @@ test_that("create_drug_response handles covariates correctly", {
   )
   expect_false("SEX" %in% colnames(response_obj_no_cov$responses))
 
-  # Test 3: Function throws an error for missing covariate columns
+  # Test 3: Helper function throws an error for missing covariate columns
+  response_obj_test <- create_drug_response(
+    conn = conn,
+    lablist = "L1",
+    druglist = "D1",
+    before_period = c(0.5, 1.5),
+    after_period = c(-0.5, 0.5)
+  )
+
   expect_error(
-    create_drug_response(
-      conn = conn,
-      lablist = "L1",
-      druglist = "D1",
-      before_period = c(0.5, 1.5),
-      after_period = c(-0.5, 0.5),
+    join_covariates(
+      data = response_obj_test$responses,
       covariates = mock_covariates,
       covariate_cols = c("SEX", "NON_EXISTENT_COL") # One valid, one invalid
     ),
@@ -448,10 +464,15 @@ test_that("get_lab_measurements can pull covariates", {
     BMI = c(25.1, 28.3, 22.5, 26.7)
   )
 
-  # Test 1: Pull with SEX covariate
+  # Test 1: Pull lab measurements and add SEX covariate separately
   result <- get_lab_measurements(
     all_labs = mock_labs,
-    lablist = 3000963,
+    lablist = 3000963
+  )
+
+  # Add covariates using helper function
+  result <- join_covariates_to_labs(
+    lab_data = result,
     covariates = mock_covariates,
     covariate_cols = c("SEX")
   )
@@ -464,7 +485,11 @@ test_that("get_lab_measurements can pull covariates", {
   # Test 2: Pull with multiple covariates
   result2 <- get_lab_measurements(
     all_labs = mock_labs,
-    lablist = 3000963,
+    lablist = 3000963
+  )
+
+  result2 <- join_covariates_to_labs(
+    lab_data = result2,
     covariates = mock_covariates,
     covariate_cols = c("SEX", "AGE_AT_DEATH_OR_END_OF_FOLLOWUP")
   )
@@ -474,9 +499,8 @@ test_that("get_lab_measurements can pull covariates", {
 
   # Test 3: Error when requesting non-existent covariate columns
   expect_error(
-    get_lab_measurements(
-      all_labs = mock_labs,
-      lablist = 3000963,
+    join_covariates_to_labs(
+      lab_data = result,
       covariates = mock_covariates,
       covariate_cols = c("SEX", "NONEXISTENT_COL")
     ),
@@ -486,17 +510,13 @@ test_that("get_lab_measurements can pull covariates", {
   # Test 4: No error when covariates or covariate_cols is NULL
   result3 <- get_lab_measurements(
     all_labs = mock_labs,
-    lablist = 3000963,
-    covariates = NULL,
-    covariate_cols = c("SEX")
+    lablist = 3000963
   )
   expect_false("SEX" %in% colnames(result3))
 
   result4 <- get_lab_measurements(
     all_labs = mock_labs,
-    lablist = 3000963,
-    covariates = mock_covariates,
-    covariate_cols = NULL
+    lablist = 3000963
   )
   expect_false("SEX" %in% colnames(result4))
 })
