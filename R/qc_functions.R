@@ -9,12 +9,12 @@ NULL
 # Declare global variables to avoid R CMD check notes
 utils::globalVariables(c("FINNGENID", "fixed_slope"))
 
-#' @title Quantile Normalize Values
-#' @description Performs quantile normalization on a numeric vector
+#' @title Inverse Rank Normalize Values
+#' @description Performs inverse rank normalization on a numeric vector
 #' @param x Numeric vector to normalize
-#' @return Quantile normalized vector with same length as input
+#' @return Inverse rank normalized vector with same length as input
 #' @export
-quantile_normalize <- function(x) {
+inverse_rank_normalize <- function(x) {
   # Remove NAs for ranking but keep track of their positions
   na_pos <- is.na(x)
   x_no_na <- x[!na_pos]
@@ -63,8 +63,8 @@ calculate_fixed_slopes <- function(data, min_measurements = 2) {
   return(as.data.frame(fixed_slopes))
 }
 
-#' @title Process Variance Files with Quantile Normalization
-#' @description Reads variance files, adds quantile normalized column, and generates summary
+#' @title Process Variance Files with Inverse Rank Normalization
+#' @description Reads variance files, adds inverse rank normalized column, and generates summary
 #' @param output_dir Directory containing variance files (default: current directory)
 #' @param pattern Regular expression pattern to match variance files (default: "_variance\\.tsv$")
 #' @param generate_plots Logical, whether to generate comparison plots (default: FALSE)
@@ -120,9 +120,9 @@ process_variance_files <- function(output_dir = ".", pattern = "_variance\\.tsv$
       next
     }
 
-    # Apply quantile normalization
+    # Apply inverse rank normalization
     norm_col_name <- paste0(variance_col, "_qnorm")
-    df[[norm_col_name]] <- quantile_normalize(df[[variance_col]])
+    df[[norm_col_name]] <- inverse_rank_normalize(df[[variance_col]])
 
     # Save normalized file if requested
     if (save_normalized) {

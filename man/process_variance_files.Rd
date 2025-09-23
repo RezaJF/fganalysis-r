@@ -2,7 +2,7 @@
 % Please edit documentation in R/qc_functions.R
 \name{process_variance_files}
 \alias{process_variance_files}
-\title{Process Variance Files with Quantile Normalization}
+\title{Process Variance Files with Inverse Rank Normalization}
 \usage{
 process_variance_files(
   output_dir = ".",
@@ -24,5 +24,5 @@ process_variance_files(
 Summary data frame with statistics for original and normalized values
 }
 \description{
-Reads variance files, adds quantile normalized column, and generates summary
+Reads variance files, adds inverse rank normalized column, and generates summary
 }

@@ -33,9 +33,9 @@ The package is organized into logical modules for better maintainability:
   - `summarize_blup_results()` - Summarizes BLUP analysis results
 
 - **`qc_functions.R`** - Quality control and normalization functions
-  - `quantile_normalize()` - Performs quantile normalization on numeric vectors
+  - `inverse_rank_normalize()` - Performs inverse rank normalization on numeric vectors
   - `calculate_fixed_slopes()` - Calculates fixed-effect slopes for comparison with BLUPs
-  - `process_variance_files()` - Processes variance files with quantile normalization
+  - `process_variance_files()` - Processes variance files with inverse rank normalization
   - `create_variance_summary_table()` - Creates summary statistics table
   - `generate_variance_plots()` - Generates comparison plots for variance distributions
 
@@ -312,11 +312,11 @@ flowchart TD
 - **`summarize_blup_results(blup_results)`**: Provides summary statistics (mean, SD, min, max) for the BLUP slopes from each OMOP concept.
 
 ### Quality Control and Normalization Functions
-- **`quantile_normalize(x)`**: Performs quantile normalization on a numeric vector, transforming it to follow a standard normal distribution while preserving rank order.
+- **`inverse_rank_normalize(x)`**: Performs inverse rank normalization on a numeric vector, transforming it to follow a standard normal distribution while preserving rank order.
 - **`calculate_fixed_slopes(data, min_measurements = 2)`**: Calculates individual-specific slopes using simple linear regression (fixed effects only) for comparison with BLUP estimates.
 - **`process_variance_files(output_dir = ".", generate_plots = FALSE, save_normalized = TRUE)`**:
   - Reads all `*_variance.tsv` files in the specified directory
-  - Adds quantile-normalized variance columns
+  - Adds inverse rank normalized variance columns
   - Generates summary statistics for both original and normalized values
   - Optionally creates comparison plots showing distributions before/after normalization
   - Saves files with `_qnorm.tsv` suffix containing the normalized data
@@ -507,7 +507,7 @@ blup_results_smoothed <- calculate_blup_slopes(
   smooth_measurement_intervals = 6 # Activate smoothing for measurements < 6 months apart
 )
 
-# 9. (Optional) Process variance files with quantile normalization
+# 9. (Optional) Process variance files with inverse rank normalization
 #    This creates summary statistics and comparison plots
 variance_summary <- process_variance_files(output_dir = "blup_output",
                                            generate_plots = TRUE,

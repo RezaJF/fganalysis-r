@@ -26,7 +26,7 @@ utils::globalVariables(c(".", "fixed_slope"))
 #' When TRUE, separate analyses are performed for each unique ATC code.
 #' @param calculate_post_variance Logical indicating whether to calculate variance of lab values in the post-drug period (default: FALSE).
 #' @param calculate_qc Logical indicating whether to calculate quality control metrics including correlation between fixed-effect and BLUP slopes (default: FALSE).
-#' @param normalize_variance Logical indicating whether to add quantile normalized variance to output files (default: FALSE).
+#' @param normalize_variance Logical indicating whether to add inverse rank normalized variance to output files (default: FALSE).
 #' @param save_model Logical indicating whether to save the fitted lmer model object as an RDS file for each OMOP concept (default: FALSE).
 #' @param plot_blup_correlation Logical indicating whether to create a scatter plot comparing BLUP slopes with fixed-effect slopes, including correlation coefficient and p-value (default: FALSE). Requires ggpubr package.
 #' @param output_file_prefix An optional character string to use as a prefix for the output file names. If not provided,

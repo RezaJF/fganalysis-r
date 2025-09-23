@@ -40,7 +40,7 @@ When TRUE, separate analyses are performed for each unique ATC code.}
 
 \item{calculate_qc}{Logical indicating whether to calculate quality control metrics including correlation between fixed-effect and BLUP slopes (default: FALSE).}
 
-\item{normalize_variance}{Logical indicating whether to add quantile normalized variance to output files (default: FALSE).}
+\item{normalize_variance}{Logical indicating whether to add inverse rank normalized variance to output files (default: FALSE).}
 
 \item{save_model}{Logical indicating whether to save the fitted lmer model object as an RDS file for each OMOP concept (default: FALSE).}
 

@@ -1,11 +1,11 @@
 library(testthat)
 library(fganalysis)
 
-test_that("quantile_normalize handles various inputs correctly", {
+test_that("inverse_rank_normalize handles various inputs correctly", {
   # Test with normal data
   set.seed(123)
   x <- rnorm(100, mean = 10, sd = 2)
-  x_norm <- quantile_normalize(x)
+  x_norm <- inverse_rank_normalize(x)
 
   expect_equal(length(x_norm), length(x))
   expect_true(abs(mean(x_norm, na.rm = TRUE)) < 0.1)  # Should be close to 0
@@ -13,20 +13,20 @@ test_that("quantile_normalize handles various inputs correctly", {
 
   # Test with NA values
   x_na <- c(1, 2, NA, 4, 5, NA)
-  x_na_norm <- quantile_normalize(x_na)
+  x_na_norm <- inverse_rank_normalize(x_na)
 
   expect_equal(which(is.na(x_na)), which(is.na(x_na_norm)))
   expect_equal(length(x_na_norm), length(x_na))
 
   # Test with all NA
   x_all_na <- rep(NA, 5)
-  expect_equal(quantile_normalize(x_all_na), x_all_na)
+  expect_equal(inverse_rank_normalize(x_all_na), x_all_na)
 
   # Test with empty vector
-  expect_equal(quantile_normalize(numeric(0)), numeric(0))
+  expect_equal(inverse_rank_normalize(numeric(0)), numeric(0))
 
   # Test with single value
-  expect_equal(quantile_normalize(5), 0)
+  expect_equal(inverse_rank_normalize(5), 0)
 })
 
 test_that("calculate_fixed_slopes works correctly", {
