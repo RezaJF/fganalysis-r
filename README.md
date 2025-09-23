@@ -98,6 +98,27 @@ The main data tables are:
 - **`labs`**: Laboratory measurements from KANTA.
 - **`minimum`**: Minimum phenotype data for individuals.
 - **`cov_pheno`**: Covariate phenotype data.
+- **`endpoint`**: Endpoint data in long format.
+- **`vnr`**: VNR (Väestörekisterikeskus) data.
+- **`long_anthropometric`**: Longitudinal anthropometric measurements.
+
+### Local Configuration
+
+For local development, you can create a `config/db_config_local.json` file with paths specific to your environment. This file is automatically ignored by git, so you can customize it without affecting the repository. The package will look for this file first, and fall back to `config/db_config.json` if it doesn't exist.
+
+Example local configuration:
+```json
+{
+    "pheno": {
+        "path": "/your/local/path/to/finngen_R13_service_sector_detailed_longitudinal_1.0.parquet",
+        "type": "parquet-hive"
+    },
+    "labs": {
+        "path": "/your/local/path/to/finngen_R13_kanta_lab_1.0.parquet",
+        "type": "parquet"
+    }
+}
+```
 
 ### Connecting to Data
 

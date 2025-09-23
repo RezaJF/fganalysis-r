@@ -1,28 +1,31 @@
 {
     "pheno": {
-        "path": "/mnt/longGWAS_disk_100GB/long_gwas/db_config/finngen_R13_service_sector_detailed_longitudinal_1.0.vnrofix.parquet",
+        "path": "/mnt/nfs/R13/finngen_R13_service_sector_detailed_longitudinal_1.0.vnrofix.parquet",
         "type": "parquet-hive"
     },
     "labs": {
-        "path": "/mnt/longGWAS_disk_100GB/long_gwas/db_config/finngen_R13_kanta_lab_2.0.parquet",
+        "path": "/mnt/nfs/R13/kanta_v2/release/finngen_R13_kanta_lab_2.0.parquet",
         "type": "parquet"
     },
     "minimum": {
-        "path": "/mnt/longGWAS_disk_100GB/long_gwas/db_config/finngen_R13_minimum_extended_1.0.parquet",
+        "path": "/mnt/nfs/R13/finngen_R13_minimum_extended_1.0.parquet",
         "type": "parquet"
     },
     "cov_pheno": {
-        "path": "/mnt/longGWAS_disk_100GB/long_gwas/db_config/R13_COV_PHENO_V0.parquet",
+        "path": "/mnt/nfs/R13/R13_COV_PHENO_V0.parquet",
         "type": "parquet"
     },
     "endpoint": {
-        "path": "/mnt/longGWAS_disk_100GB/long_gwas/db_config/finngen_R13_endpoint_2.0_longformat.parquet",
+        "path": "/mnt/nfs/R13/finngen_R13_endpoint_2.0_longformat.parquet",
         "type": "parquet"
     },
-    "vnr":{
-        "path":  "/mnt/longGWAS_disk_100GB/long_gwas/db_config/VNR_fi_2.0_dedup.tsv",
+    "vnr": {
+        "path": "/mnt/nfs/R13/finngen_vnr_2.0/VNR_fi_2.0_dedup.tsv",
         "type": "tsv",
-        "recodings": [{"column":"VNR", "function": "as.character"}]
+        "recodings": [{"column": "VNR", "function": "as.character"}]
+    },
+    "long_anthropometric": {
+        "path": "/mnt/nfs/R13/finngen_R13_hilmo_avohilmo_extended_1.0_dedup_fixbp.parquet",
+        "type": "parquet"
     }
-
 }
