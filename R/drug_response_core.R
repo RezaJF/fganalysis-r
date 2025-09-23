@@ -30,61 +30,34 @@ drug.response <- function(responses, lab_measurements,
 }
 
 #' @title Create drug response object
-#' @param conn Connection object or kanta data frame (for legacy support)
-#' @param lablist Lab list or phenos data frame (for legacy support)
-#' @param druglist Drug list
-#' @param before_period Before period
-#' @param after_period After period
-#' @param finngen_ids Finngen IDs
-#' @param remove_outliers_sd Remove outliers SD
-#' @param covariates Covariates data frame
-#' @param covariate_cols Covariate columns
-#' @param all_labs Direct labs data frame (alternative input)
-#' @param all_phenos Direct phenos data frame (alternative input)
-#' @param kanta Legacy parameter name for labs data
-#' @param phenos Legacy parameter name for phenos data
+#' @param conn A `fg_data_connection` object containing the data sources
+#' @param lablist A character vector of OMOP concept IDs for the labs of interest
+#' @param druglist A character vector of ATC drug codes
+#' @param before_period A numeric vector of length 2 defining the before period (e.g., c(-1, 0) for 1 year to 0 before drug)
+#' @param after_period A numeric vector of length 2 defining the after period (e.g., c(0.1, 1) for 0.1 to 1 year after drug)
+#' @param finngen_ids Optional character vector of FINNGENIDs to restrict analysis
+#' @param remove_outliers_sd Optional numeric value (1-6) to remove outliers based on standard deviations
+#' @param covariates Optional data frame or lazy table containing covariate data
+#' @param covariate_cols Optional character vector of column names to join from the covariates table
 #' @return drug.response object
 #' @export
-create_drug_response <- function(conn = NULL, lablist = NULL, druglist = NULL,
-                                 before_period = NULL, after_period = NULL,
+create_drug_response <- function(conn, lablist, druglist,
+                                 before_period, after_period,
                                  finngen_ids = NULL, remove_outliers_sd = NULL,
-                                 covariates = NULL,
-                                 covariate_cols = NULL,
-                                 # Alternative input parameters
-                                 all_labs = NULL, all_phenos = NULL,
-                                 # Legacy parameters
-                                 kanta = NULL, phenos = NULL) {
+                                 covariates = NULL, covariate_cols = NULL) {
 
-  # Handle different input types
-  if (!is.null(kanta) && !is.null(phenos)) {
-    # Legacy API: kanta and phenos provided directly
-    kanta <- kanta
-    phenos <- phenos
-    # Other parameters should already be in correct positions
-  } else if (inherits(conn, "fg_data_connection")) {
-    # Extract from connection object
-    kanta <- conn$labs
-    phenos <- conn$pheno
-  } else if (!is.null(all_labs) && !is.null(all_phenos)) {
-    # Direct data frame input (for testing)
-    kanta <- all_labs
-    phenos <- all_phenos
-  } else if (!is.null(conn) && is.data.frame(conn)) {
-    # Legacy positional API - conn is kanta, lablist is phenos
-    kanta <- conn
-    phenos <- lablist
-    # Shift other parameters
-    lablist <- druglist
-    druglist <- before_period
-    before_period <- after_period
-    after_period <- finngen_ids
-    finngen_ids <- remove_outliers_sd
-    remove_outliers_sd <- covariates
-    covariates <- covariate_cols
-    covariate_cols <- NULL
-  } else {
-    stop("Must provide either: 1) conn object, 2) kanta and phenos, or 3) all_labs and all_phenos")
+  # Validate input
+  if (!inherits(conn, "fg_data_connection")) {
+    stop("conn must be an fg_data_connection object")
   }
+  
+  if (is.null(lablist) || is.null(druglist) || is.null(before_period) || is.null(after_period)) {
+    stop("lablist, druglist, before_period, and after_period are required parameters")
+  }
+
+  # Extract data from connection object
+  kanta <- conn$labs
+  phenos <- conn$pheno
 
   print("Querying lab measurements...")
   lab_measurements <- get_lab_measurements(all_labs = kanta,

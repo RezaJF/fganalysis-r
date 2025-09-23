@@ -1,5 +1,11 @@
 library(testthat)
 
+# Helper function to create mock connection objects for testing
+create_mock_conn <- function(labs_data, pheno_data) {
+  conn <- list(labs = labs_data, pheno = pheno_data)
+  class(conn) <- "fg_data_connection"
+  return(conn)
+}
 
 # Load the functions from the package
 #source("R/drug_response_functions.R")
@@ -103,9 +109,9 @@ test_that("create_drug_response removes outliers correctly", {
   druglist <- c("A01", "A02")
 
   # Test with outlier removal
+  conn <- create_mock_conn(kanta, phenos)
   result <- create_drug_response(
-    kanta = kanta,
-    phenos = phenos,
+    conn = conn,
     lablist = lablist,
     druglist = druglist,
     before_period = c(-1, 0),
@@ -120,11 +126,11 @@ test_that("create_drug_response removes outliers correctly", {
 
   # Test that it throws an error with invalid input
   expect_error(create_drug_response(
-    kanta = kanta, phenos = phenos, lablist = lablist, druglist = druglist,
+    conn = conn, lablist = lablist, druglist = druglist,
     before_period = c(-1, 0), after_period = c(0.1, 1), remove_outliers_sd = 7
   ))
   expect_error(create_drug_response(
-    kanta = kanta, phenos = phenos, lablist = lablist, druglist = druglist,
+    conn = conn, lablist = lablist, druglist = druglist,
     before_period = c(-1, 0), after_period = c(0.1, 1), remove_outliers_sd = "a"
   ))
 })
@@ -250,9 +256,9 @@ test_that("create_drug_response handles covariates correctly", {
   )
 
   # Test 1: Add covariates successfully
+  conn <- create_mock_conn(mock_labs, mock_phenos)
   response_obj <- create_drug_response(
-    kanta = mock_labs,
-    phenos = mock_phenos,
+    conn = conn,
     lablist = "L1",
     druglist = "D1",
     before_period = c(0.5, 1.5),
@@ -270,8 +276,7 @@ test_that("create_drug_response handles covariates correctly", {
 
   # Test 2: Function runs normally when covariates are not provided
   response_obj_no_cov <- create_drug_response(
-    kanta = mock_labs,
-    phenos = mock_phenos,
+    conn = conn,
     lablist = "L1",
     druglist = "D1",
     before_period = c(0.5, 1.5),
@@ -282,8 +287,7 @@ test_that("create_drug_response handles covariates correctly", {
   # Test 3: Function throws an error for missing covariate columns
   expect_error(
     create_drug_response(
-      kanta = mock_labs,
-      phenos = mock_phenos,
+      conn = conn,
       lablist = "L1",
       druglist = "D1",
       before_period = c(0.5, 1.5),
