@@ -46,13 +46,47 @@ create_drug_response <- function(conn, lablist, druglist,
                                  finngen_ids = NULL, remove_outliers_sd = NULL,
                                  covariates = NULL, covariate_cols = NULL) {
 
-  # Validate input
+  # Validate all input parameters immediately
   if (!inherits(conn, "fg_data_connection")) {
     stop("conn must be an fg_data_connection object")
   }
 
   if (is.null(lablist) || is.null(druglist) || is.null(before_period) || is.null(after_period)) {
     stop("lablist, druglist, before_period, and after_period are required parameters")
+  }
+
+  # Validate parameter types and formats
+  if (!is.character(lablist) || length(lablist) == 0) {
+    stop("lablist must be a non-empty character vector")
+  }
+
+  if (!is.character(druglist) || length(druglist) == 0) {
+    stop("druglist must be a non-empty character vector")
+  }
+
+  if (!is.numeric(before_period) || length(before_period) != 2) {
+    stop("before_period must be a numeric vector of length 2")
+  }
+
+  if (!is.numeric(after_period) || length(after_period) != 2) {
+    stop("after_period must be a numeric vector of length 2")
+  }
+
+  # Validate optional parameters
+  if (!is.null(remove_outliers_sd)) {
+    if (!is.numeric(remove_outliers_sd) || remove_outliers_sd < 1 || remove_outliers_sd > 6) {
+      stop("remove_outliers_sd must be a numeric value between 1 and 6")
+    }
+  }
+
+  if (!is.null(finngen_ids) && (!is.character(finngen_ids) || length(finngen_ids) == 0)) {
+    stop("finngen_ids must be a non-empty character vector or NULL")
+  }
+
+  if (!is.null(covariates) && !is.null(covariate_cols)) {
+    if (!is.character(covariate_cols) || length(covariate_cols) == 0) {
+      stop("covariate_cols must be a non-empty character vector or NULL")
+    }
   }
 
   # Extract data from connection object
@@ -68,9 +102,6 @@ create_drug_response <- function(conn, lablist, druglist,
                                            covariate_cols = covariate_cols)
 
   if (!is.null(remove_outliers_sd)) {
-    if (!is.numeric(remove_outliers_sd) || remove_outliers_sd < 1 || remove_outliers_sd > 6) {
-      stop("remove_outliers_sd must be an integer between 1 and 6")
-    }
 
     mean_val <- mean(lab_measurements$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE)
     sd_val <- sd(lab_measurements$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE)
@@ -100,14 +131,6 @@ create_drug_response <- function(conn, lablist, druglist,
   lab_measurements <- lab_measurements %>% mutate(time_to_drug = .data$first_drug_age - .data$EVENT_AGE)
 
   print("generating response summary...")
-
-  # Validate periods early to avoid cryptic errors
-  if (is.null(before_period) || length(before_period) != 2 || !is.numeric(before_period)) {
-    stop("before_period must be a numeric vector of length 2")
-  }
-  if (is.null(after_period) || length(after_period) != 2 || !is.numeric(after_period)) {
-    stop("after_period must be a numeric vector of length 2")
-  }
 
   lab_response <- generate_response_summary(lab_measurements, before_period, after_period)
   cat("Number of individuals with response data: ", nrow(lab_response), "\n")
