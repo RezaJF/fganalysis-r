@@ -1,12 +1,5 @@
 library(testthat)
 
-# Helper function to create mock connection objects for testing
-create_mock_conn <- function(labs_data, pheno_data) {
-  conn <- list(labs = labs_data, pheno = pheno_data)
-  class(conn) <- "fg_data_connection"
-  return(conn)
-}
-
 # Load the functions from the package
 #source("R/drug_response_functions.R")
 
@@ -109,7 +102,7 @@ test_that("create_drug_response removes outliers correctly", {
   druglist <- c("A01", "A02")
 
   # Test with outlier removal
-  conn <- create_mock_conn(kanta, phenos)
+  conn <- create_mock_connection(pheno_data = phenos, labs_data = kanta)
   result <- create_drug_response(
     conn = conn,
     lablist = lablist,
@@ -256,7 +249,7 @@ test_that("create_drug_response handles covariates correctly", {
   )
 
   # Test 1: Add covariates successfully
-  conn <- create_mock_conn(mock_labs, mock_phenos)
+  conn <- create_mock_connection(pheno_data = mock_phenos, labs_data = mock_labs)
   response_obj <- create_drug_response(
     conn = conn,
     lablist = "L1",

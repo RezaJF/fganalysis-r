@@ -132,6 +132,13 @@ conn <- connect_fgdata("/finngen/shared_nfs/finngen/code/drugResponsePackage/con
 # Or using a local config file
 conn <- connect_fgdata("config/db_config.json")
 
+# For testing or development with small datasets, you can create a mock connection:
+# mock_conn <- create_mock_connection(
+#   pheno_data = your_pheno_dataframe,
+#   labs_data = your_labs_dataframe,
+#   cov_pheno_data = your_covariates_dataframe  # optional
+# )
+
 ## Returned object has attributes that are lazy loaded data frames of different phenotype data.
 ## You can start writing dplyr queries and e.g. joining to other tables. Nothing will happen before you actually request the data to be localized.
 ## Behind the scenes, a query engine optimizes the query and returns only the data matching your query.
@@ -182,6 +189,7 @@ This package provides a suite of functions for drug response analysis.
 
 ### Data Connection
 - **`connect_fgdata(path_to_conf)`**: Connects to the databases specified in the JSON configuration file and returns a `fg_data_connection` object.
+- **`create_mock_connection(pheno_data, labs_data, ...)`**: Creates a mock connection object using data frames instead of database connections. Useful for testing, development, and working with small datasets that can fit in memory.
 
 ### Data Retrieval
 - **`get_lab_measurements(all_labs, lablist, require_values = TRUE, return_cols = c("FINNGENID","OMOP_CONCEPT_ID", "EVENT_AGE", "MEASUREMENT_VALUE_HARMONIZED"), finngen_ids = NULL, lazy = FALSE, covariates = NULL, covariate_cols = NULL)`**: Extracts lab measurements for specified OMOP concept IDs.

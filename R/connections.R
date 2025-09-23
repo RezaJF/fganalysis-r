@@ -127,4 +127,66 @@ connect_fgdata <-  function(path_to_conf) {
     return(fg_data_connection( connections))
 }
 
+#' Create a mock fg_data_connection object for testing
+#' @description Creates a mock connection object using data frames instead of database connections.
+#' This is useful for testing, development, and when working with small datasets that can fit in memory.
+#' @param pheno_data Data frame containing phenotype data (required)
+#' @param labs_data Data frame containing lab measurement data (required)
+#' @param minimum_data Optional data frame containing minimum phenotype data
+#' @param cov_pheno_data Optional data frame containing covariate phenotype data
+#' @param endpoint_data Optional data frame containing endpoint data
+#' @param vnr_data Optional data frame containing VNR data
+#' @param long_anthropometric_data Optional data frame containing longitudinal anthropometric data
+#' @return A fg_data_connection object that can be used with package functions
+#' @export
+#' @examples
+#' # Create minimal mock connection
+#' mock_conn <- create_mock_connection(
+#'   pheno_data = data.frame(FINNGENID = "FG1", EVENT_AGE = 50, CODE1 = "A01", SOURCE = "PURCH"),
+#'   labs_data = data.frame(FINNGENID = "FG1", EVENT_AGE = 49, MEASUREMENT_VALUE_HARMONIZED = 100, OMOP_CONCEPT_ID = "L1")
+#' )
+#' 
+#' # Create comprehensive mock connection
+#' mock_conn_full <- create_mock_connection(
+#'   pheno_data = pheno_df,
+#'   labs_data = labs_df,
+#'   minimum_data = minimum_df,
+#'   cov_pheno_data = cov_df
+#' )
+create_mock_connection <- function(pheno_data, labs_data, 
+                                  minimum_data = NULL, cov_pheno_data = NULL,
+                                  endpoint_data = NULL, vnr_data = NULL,
+                                  long_anthropometric_data = NULL) {
+  
+  # Validate required data
+  if (is.null(pheno_data) || is.null(labs_data)) {
+    stop("pheno_data and labs_data are required")
+  }
+  
+  # Create connections list with required data
+  connections <- list(
+    pheno = pheno_data,
+    labs = labs_data
+  )
+  
+  # Add optional data if provided
+  if (!is.null(minimum_data)) {
+    connections$minimum <- minimum_data
+  }
+  if (!is.null(cov_pheno_data)) {
+    connections$cov_pheno <- cov_pheno_data
+  }
+  if (!is.null(endpoint_data)) {
+    connections$endpoint <- endpoint_data
+  }
+  if (!is.null(vnr_data)) {
+    connections$vnr <- vnr_data
+  }
+  if (!is.null(long_anthropometric_data)) {
+    connections$long_anthropometric <- long_anthropometric_data
+  }
+  
+  return(fg_data_connection(connections))
+}
+
 
