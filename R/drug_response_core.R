@@ -121,11 +121,9 @@ create_drug_response <- function(conn, lablist, druglist,
   print("Querying purchases...")
   drug_purchases <- get_drug_purchases(phenos, druglist, all_fg_ids)
 
-  # Get the first drug code column (either ATC if renamed, or CODE1 if not)
-  drug_col <- if ("ATC" %in% colnames(drug_purchases)) "ATC" else "CODE1"
-
+  # get_drug_purchases returns ATC column by default (renamed from CODE1)
   dr_first_purchase <- drug_purchases %>% group_by(.data$FINNGENID) %>% arrange(.data$EVENT_AGE) %>%
-    dplyr::summarize(n = n(), first_drug_age = first(.data$EVENT_AGE), first_drug=first(.data[[drug_col]]))
+    dplyr::summarize(n = n(), first_drug_age = first(.data$EVENT_AGE), first_drug=first(.data$ATC))
 
   lab_measurements <- dplyr::left_join(lab_measurements, dr_first_purchase, by = "FINNGENID")
   lab_measurements <- lab_measurements %>% mutate(time_to_drug = .data$first_drug_age - .data$EVENT_AGE)
