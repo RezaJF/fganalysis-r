@@ -299,10 +299,12 @@ winsorize_vector <- function(x, winsorize_pct = 0.01) {
 #' @title Smooth Measurement Intervals
 #' @description For a given individual's data, this function identifies clusters of measurements
 #' that are less than a specified number of months apart and replaces each cluster with a single
-#' representative measurement (mean age, mode value).
+#' representative measurement (mean age, median value). All other columns are carried over by
+#' taking the first value in each cluster.
 #' @param df A data frame for a single individual, containing EVENT_AGE and MEASUREMENT_VALUE_HARMONIZED.
+#' Any additional columns will be preserved by taking the first value in each cluster.
 #' @param min_interval_months The minimum interval in months. Measurements closer than this will be clustered. Defaults to 6.
-#' @return A data frame with smoothed measurement intervals.
+#' @return A data frame with smoothed measurement intervals, preserving all original columns.
 #' @export
 smooth_measurement_intervals <- function(df, min_interval_months = 6) {
   if (nrow(df) < 2) {
@@ -325,11 +327,11 @@ smooth_measurement_intervals <- function(df, min_interval_months = 6) {
     summarise(
       EVENT_AGE = mean(.data$EVENT_AGE, na.rm = TRUE),
       MEASUREMENT_VALUE_HARMONIZED = median(.data$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE),
-      # Carry over other necessary columns, taking the first value in the cluster
-      across(any_of(c("FINNGENID", "OMOP_CONCEPT_ID", "SEX_CODED")), first),
+      # Carry over all other columns, taking the first value in the cluster
+      across(-c(EVENT_AGE, MEASUREMENT_VALUE_HARMONIZED, time_diff), first),
       .groups = "drop"
     ) %>%
-    select(-.data$cluster_id)
+    select(-cluster_id)
 
   return(smoothed_df)
 }
