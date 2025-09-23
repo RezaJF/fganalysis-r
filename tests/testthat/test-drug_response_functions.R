@@ -12,7 +12,7 @@ test_that("drug.response creates the correct object", {
 
   result <- drug.response(response, lab_measurements, drug_purchases, c(-1, -0.5), c(0.5, 1))
 
-  expect_s3_class(result, "drug.reponse")
+  expect_s3_class(result, "drug.response")
   expect_equal(result$response, response)
   expect_equal(result$all_measurements, lab_measurements)
   expect_equal(result$all_drug_purchases, drug_purchases)
@@ -73,7 +73,7 @@ test_that("create_drug_response returns the correct structure", {
 
   result <- create_drug_response(conn, lablist, druglist, c(-1, 0), c(0.1, 1))
 
-  expect_s3_class(result, "drug.reponse")
+  expect_s3_class(result, "drug.response")
   expect_equal(nrow(result$response), 2)
   expect_equal(result$response$FINNGENID, c("FG1", "FG2"))
   expect_equal(result$response$before, c(16, 9))
@@ -114,7 +114,7 @@ test_that("create_drug_response removes outliers correctly", {
   )
 
   # FG4 has the outlier and should be removed from the response
-  expect_s3_class(result, "drug.reponse")
+  expect_s3_class(result, "drug.response")
   expect_equal(nrow(result$responses), 2)
   expect_false("FG4" %in% result$responses$FINNGENID)
 
@@ -234,7 +234,7 @@ test_that("plot_lab_value_distribution handles input and options correctly", {
   # Test 4: Function throws an error for invalid input
   expect_error(
     plot_lab_value_distribution(list()),
-    "Input must be a drug.reponse object."
+    "Input must be a drug.response object."
   )
 })
 
@@ -396,7 +396,7 @@ test_that("calculate_blup_slopes works correctly", {
   # Test 4: Function throws error for invalid input
   expect_error(
     calculate_blup_slopes(list()),
-    "Input must be either a drug.reponse object or a data frame with lab measurements."
+    "Input must be either a drug.response object or a data frame with lab measurements."
   )
 
   # Clean up temporary files

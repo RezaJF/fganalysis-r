@@ -63,10 +63,10 @@ calculate_blup_slopes <- function(data, output_dir = ".",
                                   smooth_measurement_intervals = NULL) {
 
   # Check input type and extract lab data accordingly
-  is_drug_response <- inherits(data, "drug.reponse")
+  is_drug_response <- inherits(data, "drug.response")
 
   if (!is_drug_response && !is.data.frame(data)) {
-    stop("Input must be either a drug.reponse object or a data frame with lab measurements.")
+    stop("Input must be either a drug.response object or a data frame with lab measurements.")
   }
 
   # Validate data frame input

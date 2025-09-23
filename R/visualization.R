@@ -134,8 +134,8 @@ summarize_drug_response <- function(drug_response, out_file_prefix) {
 #' @return A `ggplot` object with consistent ordering and ggpubr color palette.
 #' @export
 plot_lab_value_distribution <- function(drug_response, remove_outliers = FALSE) {
-  if (!inherits(drug_response, "drug.reponse")) {
-    stop("Input must be a drug.reponse object.")
+  if (!inherits(drug_response, "drug.response")) {
+    stop("Input must be a drug.response object.")
   }
 
   # Define periods from the response object for consistency
@@ -209,8 +209,8 @@ plot_lab_value_distribution <- function(drug_response, remove_outliers = FALSE) 
 #' @return NULL
 #' @export
 summarize_drug_purchases_upset <- function(drug_response, out_file_prefix) {
-  if (!inherits(drug_response, "drug.reponse")) {
-    stop("Input must be a drug.reponse object.")
+  if (!inherits(drug_response, "drug.response")) {
+    stop("Input must be a drug.response object.")
   }
 
   upset_data <- drug_response$all_drug_purchases %>%

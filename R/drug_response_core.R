@@ -25,7 +25,7 @@ drug.response <- function(responses, lab_measurements,
               all_drug_purchases = drug_purchases,
               lab_response_period = list(before_period = before_period,
                                          after_period = after_period))
-  class(obj) <- "drug.reponse"
+  class(obj) <- "drug.response"
   obj
 }
 
