@@ -50,7 +50,7 @@ create_drug_response <- function(conn, lablist, druglist,
   if (!inherits(conn, "fg_data_connection")) {
     stop("conn must be an fg_data_connection object")
   }
-  
+
   if (is.null(lablist) || is.null(druglist) || is.null(before_period) || is.null(after_period)) {
     stop("lablist, druglist, before_period, and after_period are required parameters")
   }

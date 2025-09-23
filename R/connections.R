@@ -145,7 +145,7 @@ connect_fgdata <-  function(path_to_conf) {
 #'   pheno_data = data.frame(FINNGENID = "FG1", EVENT_AGE = 50, CODE1 = "A01", SOURCE = "PURCH"),
 #'   labs_data = data.frame(FINNGENID = "FG1", EVENT_AGE = 49, MEASUREMENT_VALUE_HARMONIZED = 100, OMOP_CONCEPT_ID = "L1")
 #' )
-#' 
+#'
 #' # Create comprehensive mock connection
 #' mock_conn_full <- create_mock_connection(
 #'   pheno_data = pheno_df,
@@ -153,22 +153,22 @@ connect_fgdata <-  function(path_to_conf) {
 #'   minimum_data = minimum_df,
 #'   cov_pheno_data = cov_df
 #' )
-create_mock_connection <- function(pheno_data, labs_data, 
+create_mock_connection <- function(pheno_data, labs_data,
                                   minimum_data = NULL, cov_pheno_data = NULL,
                                   endpoint_data = NULL, vnr_data = NULL,
                                   long_anthropometric_data = NULL) {
-  
+
   # Validate required data
   if (is.null(pheno_data) || is.null(labs_data)) {
     stop("pheno_data and labs_data are required")
   }
-  
+
   # Create connections list with required data
   connections <- list(
     pheno = pheno_data,
     labs = labs_data
   )
-  
+
   # Add optional data if provided
   if (!is.null(minimum_data)) {
     connections$minimum <- minimum_data
@@ -185,7 +185,7 @@ create_mock_connection <- function(pheno_data, labs_data,
   if (!is.null(long_anthropometric_data)) {
     connections$long_anthropometric <- long_anthropometric_data
   }
-  
+
   return(fg_data_connection(connections))
 }
 
