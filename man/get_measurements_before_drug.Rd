@@ -9,8 +9,6 @@ get_measurements_before_drug(
   lablist,
   druglist,
   months_before,
-  covariates = NULL,
-  covariate_cols = NULL,
   remove_outliers_sd = NULL,
   winsorize_pct = NULL,
   range_sd_filter = NULL
@@ -26,10 +24,6 @@ get_measurements_before_drug(
 \item{months_before}{A numeric value specifying the time window in months before the first drug
 purchase to include lab measurements. Defaults to 3.}
 
-\item{covariates}{An optional data frame or lazy table containing covariate data.}
-
-\item{covariate_cols}{A character vector of column names to join from the `covariates` table.}
-
 \item{remove_outliers_sd}{An optional numeric value specifying the number of standard deviations
 to use for outlier removal. Values outside `mean ± sd * remove_outliers_sd` will be removed.}
 
@@ -38,7 +32,13 @@ Represents the percentage to winsorize on each tail. For example, 0.05 (5%) will
 below the 5th percentile and above the 95th percentile.}
 
 \item{range_sd_filter}{An optional list with `lower_bound`, `upper_bound`, and `nsd` for
-range-based standard deviation filtering.}
+robust range-based standard deviation filtering. This implements a two-step outlier removal process:
+(1) First, filters the data to include only values within the specified range (lower_bound to upper_bound),
+(2) Then calculates the mean and standard deviation on this filtered subset,
+(3) Finally removes all values from the original data that are more than `nsd` standard deviations
+from the calculated mean. This approach is useful for removing extreme outliers without them
+skewing the statistics used for the filtering itself. Example:
+`range_sd_filter = list(lower_bound = 50, upper_bound = 200, nsd = 4)`.}
 }
 \value{
 A data frame of lab measurements with an `n_measurements` column, compatible with `calculate_blup_slopes`.

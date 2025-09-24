@@ -5,30 +5,29 @@
 \title{Create drug response object}
 \usage{
 create_drug_response(
-  conn = NULL,
-  lablist = NULL,
-  druglist = NULL,
-  before_period = NULL,
-  after_period = NULL,
+  conn,
+  lablist,
+  druglist,
+  before_period,
+  after_period,
   finngen_ids = NULL,
-  remove_outliers_sd = NULL,
+  remove_outliers_sd = NULL
 )
 }
 \arguments{
-\item{conn}{Connection object or kanta data frame (for legacy support)}
+\item{conn}{A `fg_data_connection` object containing the data sources}
 
-\item{lablist}{Lab list or phenos data frame (for legacy support)}
+\item{lablist}{A character vector of OMOP concept IDs for the labs of interest}
 
-\item{druglist}{Drug list}
+\item{druglist}{A character vector of ATC drug codes}
 
-\item{before_period}{Before period}
+\item{before_period}{A numeric vector of length 2 defining the before period (e.g., c(-1, 0) for 1 year to 0 before drug)}
 
-\item{after_period}{After period}
+\item{after_period}{A numeric vector of length 2 defining the after period (e.g., c(0.1, 1) for 0.1 to 1 year after drug)}
 
-\item{finngen_ids}{Finngen IDs}
+\item{finngen_ids}{Optional character vector of FINNGENIDs to restrict analysis}
 
-\item{remove_outliers_sd}{Remove outliers SD}
-
+\item{remove_outliers_sd}{Optional numeric value (1-6) to remove outliers based on standard deviations}
 }
 \value{
 drug.response object

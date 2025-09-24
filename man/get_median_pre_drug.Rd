@@ -9,10 +9,7 @@ get_median_pre_drug(
   lablist,
   druglist,
   months_before = 1,
-  covariates = NULL,
-  covariate_cols = NULL,
   remove_outliers_mad_th = 5,
-  generate_plots = FALSE,
   output_dir = ".",
   output_file_prefix = ""
 )
@@ -26,13 +23,7 @@ get_median_pre_drug(
 
 \item{months_before}{The time window in months before the first drug purchase (default: 1).}
 
-\item{covariates}{Optional data frame for covariate data.}
-
-\item{covariate_cols}{Optional character vector of covariate column names.}
-
 \item{remove_outliers_mad_th}{The threshold for MAD-based outlier removal (default: 5).}
-
-\item{generate_plots}{Logical, whether to generate and save diagnostic plots (default: `FALSE`).}
 
 \item{output_dir}{The directory to save outputs (default: `"."`).}
 
@@ -44,5 +35,5 @@ A data frame with median lab values per individual, ready for GWAS analysis.
 \description{
 Calculates the median lab value for each individual within a specified time window before
 the first purchase of a given drug. This function includes robust outlier removal using the
-Median Absolute Deviation (MAD) method and generates diagnostic plots.
+Median Absolute Deviation (MAD) method. For diagnostic plots, use the separate `plot_median_pre_drug` function.
 }
