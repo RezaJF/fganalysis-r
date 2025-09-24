@@ -23,7 +23,7 @@ Imports:
     lme4,
     rlang,
     grDevices,
-    utils
+    utils,
     checkmate
 Suggests:
     testthat
