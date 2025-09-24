@@ -593,7 +593,7 @@ measurements_before_mad <- get_measurements_before_drug(
 
 # Apply MAD outlier removal
 measurements_after_mad <- measurements_before_mad %>%
-  filter(MEASUREMENT_VALUE_HARMONIZED %in% 
+  filter(MEASUREMENT_VALUE_HARMONIZED %in%
          filter_outliers_mad(MEASUREMENT_VALUE_HARMONIZED, th = 5))
 
 # Calculate median values (data processing only)
