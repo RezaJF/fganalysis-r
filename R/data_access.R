@@ -145,14 +145,14 @@ get_first_purchase <- function(all_phenos, druglist, finngen_ids=NULL,
 #' @return Data frame with lab measurements and joined covariates
 #' @export
 #' @examples
-#' # Join sex covariate to lab measurements
+#' Join sex covariate to lab measurements
 #' lab_with_sex <- join_covariates_to_labs(
 #'   lab_data = lab_measurements,
 #'   covariates = conn$cov_pheno,
 #'   covariate_cols = c("SEX")
 #' )
 #'
-#' # Join multiple covariates
+#' Join multiple covariates
 #' lab_with_covariates <- join_covariates_to_labs(
 #'   lab_data = lab_measurements,
 #'   covariates = conn$cov_pheno,
@@ -200,7 +200,7 @@ join_covariates_to_labs <- function(lab_data, covariates, covariate_cols) {
 #' @return Data frame with joined covariates
 #' @export
 #' @examples
-#' # Join covariates to drug response data
+#' Join covariates to drug response data
 #' response_with_covariates <- join_covariates(
 #'   data = drug_response$responses,
 #'   covariates = conn$cov_pheno,

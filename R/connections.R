@@ -140,13 +140,13 @@ connect_fgdata <-  function(path_to_conf) {
 #' @return A fg_data_connection object that can be used with package functions
 #' @export
 #' @examples
-#' # Create minimal mock connection
+#' Create minimal mock connection
 #' mock_conn <- create_mock_connection(
 #'   pheno_data = data.frame(FINNGENID = "FG1", EVENT_AGE = 50, CODE1 = "A01", SOURCE = "PURCH"),
 #'   labs_data = data.frame(FINNGENID = "FG1", EVENT_AGE = 49, MEASUREMENT_VALUE_HARMONIZED = 100, OMOP_CONCEPT_ID = "L1")
 #' )
 #'
-#' # Create comprehensive mock connection
+#'  Create comprehensive mock connection
 #' mock_conn_full <- create_mock_connection(
 #'   pheno_data = pheno_df,
 #'   labs_data = labs_df,
