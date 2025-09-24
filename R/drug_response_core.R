@@ -179,7 +179,13 @@ generate_response_summary <- function(lab_measurements, before_period, after_per
 #' Represents the percentage to winsorize on each tail. For example, 0.05 (5%) will cap values
 #' below the 5th percentile and above the 95th percentile.
 #' @param range_sd_filter An optional list with `lower_bound`, `upper_bound`, and `nsd` for
-#' range-based standard deviation filtering.
+#' robust range-based standard deviation filtering. This implements a two-step outlier removal process:
+#' (1) First, filters the data to include only values within the specified range (lower_bound to upper_bound),
+#' (2) Then calculates the mean and standard deviation on this filtered subset,
+#' (3) Finally removes all values from the original data that are more than `nsd` standard deviations
+#' from the calculated mean. This approach is useful for removing extreme outliers without them
+#' skewing the statistics used for the filtering itself. Example: 
+#' `range_sd_filter = list(lower_bound = 50, upper_bound = 200, nsd = 4)`.
 #' @return A data frame of lab measurements with an `n_measurements` column, compatible with `calculate_blup_slopes`.
 #' @export
 get_measurements_before_drug <- function(conn, lablist, druglist, months_before,
