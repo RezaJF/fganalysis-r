@@ -67,7 +67,7 @@ create_drug_response <- function(
     orig <- nrow(lab_measurements)
     lab_measurements <- lab_measurements %>% filter(.data$VALUE >= filter_min_max[1] &
         .data$VALUE <= filter_min_max[2])
-
+    print( paste0("Number of lab measurements: " , lab_measurements %>% nrow() ))
     print(paste0("Filtered ", orig - nrow(lab_measurements), " measurements due to min and max filters"))
 
     all_fg_ids <- unique(c(lab_measurements$FINNGENID), finngen_ids)
