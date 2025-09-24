@@ -12,12 +12,6 @@ create_drug_response(
   after_period = NULL,
   finngen_ids = NULL,
   remove_outliers_sd = NULL,
-  covariates = NULL,
-  covariate_cols = NULL,
-  all_labs = NULL,
-  all_phenos = NULL,
-  kanta = NULL,
-  phenos = NULL
 )
 }
 \arguments{
@@ -35,17 +29,6 @@ create_drug_response(
 
 \item{remove_outliers_sd}{Remove outliers SD}
 
-\item{covariates}{Covariates data frame}
-
-\item{covariate_cols}{Covariate columns}
-
-\item{all_labs}{Direct labs data frame (alternative input)}
-
-\item{all_phenos}{Direct phenos data frame (alternative input)}
-
-\item{kanta}{Legacy parameter name for labs data}
-
-\item{phenos}{Legacy parameter name for phenos data}
 }
 \value{
 drug.response object

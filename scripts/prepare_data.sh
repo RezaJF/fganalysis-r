@@ -14,10 +14,7 @@ duckdb -c "COPY (select * from read_csv('finngen_R13_minimum_extended_1.0.txt.gz
 
 duckdb -c "COPY (select * from read_csv('R13_COV_PHENO_V0.txt.gz',delim='\t', nullstr="NA") ) to 'R13_COV_PHENO_V0.parquet' (FORMAT parquet)"
 
-
-
-
-
+duckdb -c "COPY (select * from read_csv('finngen_R13_hilmo_avohilmo_extended_1.0_dedup_fixbp.txt.gz',delim='\t', nullstr="NA") ) to 'finngen_R13_hilmo_avohilmo_extended_1.0_dedup_fixbp.parquet' (FORMAT parquet)"
 
 
 
