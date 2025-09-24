@@ -213,6 +213,9 @@ The package follows the **single responsibility principle** for covariate handli
 - **Testability**: Easier to test individual components
 - **Maintainability**: Less complex functions are easier to maintain
 
+### Visualization
+- **`plot_median_pre_drug(measurements_before_mad, measurements_after_mad, output_dir = ".", output_file_prefix = "", sex_cols = c("SEX", "SEX_IMPUTED"))`**: Generates diagnostic plots for median pre-drug analysis, including distribution plots before and after MAD outlier removal, and sex-stratified violin plots. This function is designed to work with the output from `get_median_pre_drug` or similar data structures.
+
 ### Analysis
 - **`create_drug_response(conn, lablist, druglist, before_period, after_period, finngen_ids = NULL, remove_outliers_sd = NULL)`**: The main analysis function. It calculates the drug response based on lab value changes before and after the first drug purchase. The `remove_outliers_sd` parameter can be used to remove outliers (specify number of SDs from mean, e.g., 1-6).
 - **`generate_response_summary(lab_measurements, before_period, after_period, summary_function = median)`**: A helper function to calculate the summary statistics for the response (e.g., median value before and after treatment). Called by `create_drug_response`. The `summary_function` parameter allows using different summary statistics (default is median).
@@ -229,10 +232,10 @@ The package follows the **single responsibility principle** for covariate handli
   - `range_sd_filter`: An optional parameter for robust outlier removal. It takes a list with three named elements: `lower_bound`, `upper_bound`, and `nsd`. The function calculates the mean and standard deviation on the subset of data within the specified bounds and then removes all values from the original data that are more than `nsd` standard deviations from that calculated mean. This is useful for removing extreme outliers without them skewing the statistics used for the filtering itself. Example: `range_sd_filter = list(lower_bound = 50, upper_bound = 200, nsd = 4)`.
    Note: Only one outlier removal method (`remove_outliers_sd`, `winsorize_pct`, or `range_sd_filter`) should be used at a time.
 
-- **`get_median_pre_drug(conn, lablist, druglist, months_before = 1, remove_outliers_mad_th = 5, generate_plots = FALSE, output_dir = ".", output_file_prefix = "")`**: Calculates median lab values pre-medication with MAD-based outlier removal.
+- **`get_median_pre_drug(conn, lablist, druglist, months_before = 1, remove_outliers_mad_th = 5, output_dir = ".", output_file_prefix = "")`**: Calculates median lab values pre-medication with MAD-based outlier removal.
   - Outputs tab-delimited files (`{output_file_prefix}_{OMOP_CONCEPT_ID}_DF13_median.tsv`) with columns: FID, IID, and {OMOP_CONCEPT_ID}_median
-  - Generates diagnostic plots when `generate_plots = TRUE`: histograms and sex-stratified violin plots
   - Uses Median Absolute Deviation (MAD) for robust outlier removal with threshold parameter
+  - For diagnostic plots, use the separate `plot_median_pre_drug` function
 
 ### Output File Naming Convention
 To avoid file conflicts when running both BLUP and median analyses:
@@ -576,6 +579,41 @@ variance_summary <- process_variance_files(output_dir = "blup_output",
                                            generate_plots = TRUE,
                                            save_normalized = TRUE)
 print(variance_summary)
+
+# 10. (Optional) Median pre-drug analysis with separated plotting
+#     This demonstrates the new separated approach following single responsibility principle
+
+# Get measurements before drug purchase
+measurements_before_mad <- get_measurements_before_drug(
+  conn = conn,
+  lablist = c("3001308"), # LDL
+  druglist = c("C10AA"),  # Statins
+  months_before = 1
+)
+
+# Apply MAD outlier removal
+measurements_after_mad <- measurements_before_mad %>%
+  filter(MEASUREMENT_VALUE_HARMONIZED %in% 
+         filter_outliers_mad(MEASUREMENT_VALUE_HARMONIZED, th = 5))
+
+# Calculate median values (data processing only)
+median_results <- get_median_pre_drug(
+  conn = conn,
+  lablist = c("3001308"),
+  druglist = c("C10AA"),
+  months_before = 1,
+  remove_outliers_mad_th = 5,
+  output_dir = "median_output",
+  output_file_prefix = "statin_ldl"
+)
+
+# Generate diagnostic plots (separate function)
+plot_median_pre_drug(
+  measurements_before_mad = measurements_before_mad,
+  measurements_after_mad = measurements_after_mad,
+  output_dir = "median_output",
+  output_file_prefix = "statin_ldl"
+)
 ```
 
 This will produce files like `statin_ldl_response_summary.pdf`, `statin_ldl_response_summary_responses_by_drug.txt`, etc., in your working directory.

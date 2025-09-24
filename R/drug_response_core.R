@@ -271,20 +271,18 @@ get_measurements_before_drug <- function(conn, lablist, druglist, months_before,
 #' @title Get Median Lab Values Before Drug Purchase with MAD Outlier Removal
 #' @description Calculates the median lab value for each individual within a specified time window before
 #' the first purchase of a given drug. This function includes robust outlier removal using the
-#' Median Absolute Deviation (MAD) method and generates diagnostic plots.
+#' Median Absolute Deviation (MAD) method. For diagnostic plots, use the separate `plot_median_pre_drug` function.
 #' @param conn A `fg_data_connection` object.
 #' @param lablist A character vector of OMOP concept IDs.
 #' @param druglist A character vector of ATC drug codes.
 #' @param months_before The time window in months before the first drug purchase (default: 1).
 #' @param remove_outliers_mad_th The threshold for MAD-based outlier removal (default: 5).
-#' @param generate_plots Logical, whether to generate and save diagnostic plots (default: `FALSE`).
 #' @param output_dir The directory to save outputs (default: `"."`).
 #' @param output_file_prefix A prefix for output file names.
 #' @return A data frame with median lab values per individual, ready for GWAS analysis.
 #' @export
 get_median_pre_drug <- function(conn, lablist, druglist, months_before = 1,
                                 remove_outliers_mad_th = 5,
-                                generate_plots = FALSE,
                                 output_dir = ".",
                                 output_file_prefix = "") {
 
@@ -303,84 +301,7 @@ get_median_pre_drug <- function(conn, lablist, druglist, months_before = 1,
       filter(.data$MEASUREMENT_VALUE_HARMONIZED %in% filter_outliers_mad(.data$MEASUREMENT_VALUE_HARMONIZED, th = remove_outliers_mad_th))
   }
 
-  # 3. Generate diagnostic plots if requested
-  if (generate_plots) {
-
-    # Distribution plot before and after MAD removal
-    data_before <- data.frame(value = measurements$MEASUREMENT_VALUE_HARMONIZED, group = "Before")
-    data_after <- data.frame(value = measurements_mad$MEASUREMENT_VALUE_HARMONIZED, group = "After")
-    plot_data <- rbind(data_before, data_after)
-
-    dist_plot <- gghistogram(plot_data, x = "value",
-      add = "mean", rug = TRUE,
-      color = "group", fill = "group",
-      palette = c("#00AFBB", "#E7B800"),
-      title = "Distribution Before and After MAD Outlier Removal",
-      xlab = "Lab Value",
-      ylab = "Density"
-    )
-    ggsave(file.path(output_dir, paste0(output_file_prefix, "_mad_distribution.png")), plot = dist_plot)
-
-    # Violin plot of median distribution between males and females
-    sex_col <- if("SEX_IMPUTED" %in% covariate_cols) "SEX_IMPUTED" else if("SEX" %in% covariate_cols) "SEX" else NULL
-
-    if (!is.null(sex_col)) {
-      # Prepare sex column for visualization
-      if (sex_col == "SEX_IMPUTED") {
-        measurements <- measurements %>%
-          mutate(SEX_VIS = case_when(
-            .data[[sex_col]] == 0 ~ "Male",
-            .data[[sex_col]] == 1 ~ "Female",
-            TRUE ~ "Unknown"
-          ))
-        measurements_mad <- measurements_mad %>%
-          mutate(SEX_VIS = case_when(
-            .data[[sex_col]] == 0 ~ "Male",
-            .data[[sex_col]] == 1 ~ "Female",
-            TRUE ~ "Unknown"
-          ))
-      } else {
-        measurements <- measurements %>%
-          mutate(SEX_VIS = case_when(
-            toupper(.data[[sex_col]]) %in% c("M", "MALE", "1") ~ "Male",
-            toupper(.data[[sex_col]]) %in% c("F", "FEMALE", "2") ~ "Female",
-            TRUE ~ "Unknown"
-          ))
-        measurements_mad <- measurements_mad %>%
-          mutate(SEX_VIS = case_when(
-            toupper(.data[[sex_col]]) %in% c("M", "MALE", "1") ~ "Male",
-            toupper(.data[[sex_col]]) %in% c("F", "FEMALE", "2") ~ "Female",
-            TRUE ~ "Unknown"
-          ))
-      }
-
-      pre_mad_sex <- measurements %>%
-        filter(.data$SEX_VIS != "Unknown") %>%
-        group_by(.data$FINNGENID, .data$SEX_VIS) %>%
-        summarise(median_val = median(.data$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE), .groups = "drop") %>%
-        mutate(group = "Before MAD")
-
-      post_mad_sex <- measurements_mad %>%
-        filter(.data$SEX_VIS != "Unknown") %>%
-        group_by(.data$FINNGENID, .data$SEX_VIS) %>%
-        summarise(median_val = median(.data$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE), .groups = "drop") %>%
-        mutate(group = "After MAD")
-
-      violin_data <- rbind(pre_mad_sex, post_mad_sex)
-
-      violin_plot <- ggviolin(violin_data, x = "group", y = "median_val", fill = "group",
-               palette = c("#FC4E07", "#00AFBB"),
-               add = "boxplot", add.params = list(fill = "white")) +
-        facet_wrap(~SEX_VIS) +
-        stat_compare_means(label = "p.signif") +
-        labs(title = "Median Lab Values by Sex (Before and After MAD)",
-             x = "Group", y = "Median Lab Value")
-
-      ggsave(file.path(output_dir, paste0(output_file_prefix, "_sex_violin.png")), plot = violin_plot)
-    }
-  }
-
-  # 4. Calculate median values
+  # 3. Calculate median values
   median_values <- measurements_mad %>%
     group_by(FINNGENID) %>%
     summarise(
@@ -388,7 +309,7 @@ get_median_pre_drug <- function(conn, lablist, druglist, months_before = 1,
       .groups = "drop"
     )
 
-  # 5. Format for output
+  # 4. Format for output
   output_df <- data.frame(
     FID = median_values$FINNGENID,
     IID = median_values$FINNGENID,
@@ -396,9 +317,115 @@ get_median_pre_drug <- function(conn, lablist, druglist, months_before = 1,
   )
   colnames(output_df)[3] <- paste0(lablist[1], "_median")
 
-  # 6. Save to file
+  # 5. Save to file
   output_file <- file.path(output_dir, paste0(output_file_prefix, "_", lablist[1], "_DF13_median.tsv"))
   write.table(output_df, file = output_file, sep = "\t", row.names = FALSE, quote = FALSE)
 
   return(output_df)
+}
+
+#' @title Plot Median Pre-Drug Analysis Results
+#' @description Generates diagnostic plots for median pre-drug analysis, including distribution plots
+#' before and after MAD outlier removal, and sex-stratified violin plots. This function is designed
+#' to work with the output from `get_median_pre_drug` or similar data structures.
+#' @param measurements_before_mad Data frame with lab measurements before MAD outlier removal
+#' @param measurements_after_mad Data frame with lab measurements after MAD outlier removal
+#' @param output_dir Directory to save plot files (default: ".")
+#' @param output_file_prefix Prefix for output file names (default: "")
+#' @param sex_cols Optional character vector of sex column names to check for in the data
+#' @return Invisible NULL. Saves plots to files in the specified directory.
+#' @export
+plot_median_pre_drug <- function(measurements_before_mad, measurements_after_mad,
+                                 output_dir = ".", output_file_prefix = "",
+                                 sex_cols = c("SEX", "SEX_IMPUTED")) {
+
+  # Validate inputs
+  if (!is.data.frame(measurements_before_mad) || !is.data.frame(measurements_after_mad)) {
+    stop("measurements_before_mad and measurements_after_mad must be data frames")
+  }
+
+  if (!dir.exists(output_dir)) {
+    stop("output_dir must be an existing directory")
+  }
+
+  # 1. Distribution plot before and after MAD removal
+  data_before <- data.frame(value = measurements_before_mad$MEASUREMENT_VALUE_HARMONIZED, group = "Before")
+  data_after <- data.frame(value = measurements_after_mad$MEASUREMENT_VALUE_HARMONIZED, group = "After")
+  plot_data <- rbind(data_before, data_after)
+
+  dist_plot <- gghistogram(plot_data, x = "value",
+    add = "mean", rug = TRUE,
+    color = "group", fill = "group",
+    palette = c("#00AFBB", "#E7B800"),
+    title = "Distribution Before and After MAD Outlier Removal",
+    xlab = "Lab Value",
+    ylab = "Density"
+  )
+  ggsave(file.path(output_dir, paste0(output_file_prefix, "_mad_distribution.png")), plot = dist_plot)
+
+  # 2. Sex-stratified violin plots (if sex data is available)
+  sex_col <- NULL
+  for (col in sex_cols) {
+    if (col %in% colnames(measurements_before_mad)) {
+      sex_col <- col
+      break
+    }
+  }
+
+  if (!is.null(sex_col)) {
+    # Prepare sex column for visualization
+    if (sex_col == "SEX_IMPUTED") {
+      measurements_before_mad <- measurements_before_mad %>%
+        mutate(SEX_VIS = case_when(
+          .data[[sex_col]] == 0 ~ "Male",
+          .data[[sex_col]] == 1 ~ "Female",
+          TRUE ~ "Unknown"
+        ))
+      measurements_after_mad <- measurements_after_mad %>%
+        mutate(SEX_VIS = case_when(
+          .data[[sex_col]] == 0 ~ "Male",
+          .data[[sex_col]] == 1 ~ "Female",
+          TRUE ~ "Unknown"
+        ))
+    } else {
+      measurements_before_mad <- measurements_before_mad %>%
+        mutate(SEX_VIS = case_when(
+          toupper(.data[[sex_col]]) %in% c("M", "MALE", "1") ~ "Male",
+          toupper(.data[[sex_col]]) %in% c("F", "FEMALE", "2") ~ "Female",
+          TRUE ~ "Unknown"
+        ))
+      measurements_after_mad <- measurements_after_mad %>%
+        mutate(SEX_VIS = case_when(
+          toupper(.data[[sex_col]]) %in% c("M", "MALE", "1") ~ "Male",
+          toupper(.data[[sex_col]]) %in% c("F", "FEMALE", "2") ~ "Female",
+          TRUE ~ "Unknown"
+        ))
+    }
+
+    pre_mad_sex <- measurements_before_mad %>%
+      filter(.data$SEX_VIS != "Unknown") %>%
+      group_by(.data$FINNGENID, .data$SEX_VIS) %>%
+      summarise(median_val = median(.data$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE), .groups = "drop") %>%
+      mutate(group = "Before MAD")
+
+    post_mad_sex <- measurements_after_mad %>%
+      filter(.data$SEX_VIS != "Unknown") %>%
+      group_by(.data$FINNGENID, .data$SEX_VIS) %>%
+      summarise(median_val = median(.data$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE), .groups = "drop") %>%
+      mutate(group = "After MAD")
+
+    violin_data <- rbind(pre_mad_sex, post_mad_sex)
+
+    violin_plot <- ggviolin(violin_data, x = "group", y = "median_val", fill = "group",
+             palette = c("#FC4E07", "#00AFBB"),
+             add = "boxplot", add.params = list(fill = "white")) +
+      facet_wrap(~SEX_VIS) +
+      stat_compare_means(label = "p.signif") +
+      labs(title = "Median Lab Values by Sex (Before and After MAD)",
+           x = "Group", y = "Median Lab Value")
+
+    ggsave(file.path(output_dir, paste0(output_file_prefix, "_sex_violin.png")), plot = violin_plot)
+  }
+
+  invisible(NULL)
 }
