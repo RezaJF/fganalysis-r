@@ -184,7 +184,7 @@ generate_response_summary <- function(lab_measurements, before_period, after_per
 #' (2) Then calculates the mean and standard deviation on this filtered subset,
 #' (3) Finally removes all values from the original data that are more than `nsd` standard deviations
 #' from the calculated mean. This approach is useful for removing extreme outliers without them
-#' skewing the statistics used for the filtering itself. Example: 
+#' skewing the statistics used for the filtering itself. Example:
 #' `range_sd_filter = list(lower_bound = 50, upper_bound = 200, nsd = 4)`.
 #' @return A data frame of lab measurements with an `n_measurements` column, compatible with `calculate_blup_slopes`.
 #' @export
