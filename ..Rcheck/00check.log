@@ -6,7 +6,7 @@
     GNU Fortran (conda-forge gcc 10.4.0-19) 10.4.0
 * running under: Debian GNU/Linux 12 (bookworm)
 * using session charset: UTF-8
-* using option ‘--no-manual’
+* using options ‘--no-manual --no-vignettes’
 * checking for file ‘./DESCRIPTION’ ... OK
 * checking extension type ... Package
 * this is package ‘fganalysis’ version ‘0.1.0’
@@ -46,61 +46,32 @@ Most likely, these were included erroneously.
 * checking whether the package can be unloaded cleanly ... OK
 * checking whether the namespace can be loaded with stated dependencies ... OK
 * checking whether the namespace can be unloaded cleanly ... OK
-* checking loading without being on the library search path ... OK
 * checking dependencies in R code ... OK
 * checking S3 generic/method consistency ... OK
 * checking replacement functions ... OK
 * checking foreign function calls ... OK
-* checking R code for possible problems ... OK
+* checking R code for possible problems ... NOTE
+smooth_measurement_intervals: no visible binding for global variable
+  ‘MEASUREMENT_VALUE_HARMONIZED’
+smooth_measurement_intervals: no visible binding for global variable
+  ‘time_diff’
+smooth_measurement_intervals: no visible binding for global variable
+  ‘cluster_id’
+Undefined global functions or variables:
+  MEASUREMENT_VALUE_HARMONIZED cluster_id time_diff
 * checking Rd files ... OK
 * checking Rd metadata ... OK
 * checking Rd cross-references ... OK
 * checking for missing documentation entries ... OK
-* checking for code/documentation mismatches ... WARNING
-Codoc mismatches from documentation object 'calculate_blup_slopes':
-calculate_blup_slopes
-  Code: function(data, output_dir = ".", min_measurements = 2,
-                 include_sex = TRUE, debug_dir = NULL,
-                 drug_exposed_only = FALSE, calculate_post_variance =
-                 FALSE, calculate_qc = FALSE, normalize_variance =
-                 FALSE, save_model = FALSE, plot_blup_correlation =
-                 FALSE, output_file_prefix = NULL)
-  Docs: function(data, output_dir = ".", min_measurements = 2,
-                 include_sex = TRUE, debug_dir = NULL,
-                 drug_exposed_only = FALSE, calculate_post_variance =
-                 FALSE, calculate_qc = FALSE, normalize_variance =
-                 FALSE, save_model = FALSE, plot_blup_correlation = FALSE,
-                 output_file_prefix = NULL)
-  Mismatches in argument names (first 3):
-    Position: 3 Code: min_measurements Docs: min_measurements
-    Position: 4 Code: include_sex Docs: include_sex
-    Position: 5 Code: debug_dir Docs: debug_dir
-
+* checking for code/documentation mismatches ... OK
 * checking Rd \usage sections ... OK
 * checking Rd contents ... OK
 * checking for unstated dependencies in examples ... OK
 * checking LazyData ... NOTE
   'LazyData' is specified without a 'data' directory
-* checking examples ... NONE
+* checking examples ... OK
 * checking for unstated dependencies in ‘tests’ ... OK
-* checking tests ... ERROR
+* checking tests ... OK
   Running ‘testthat.R’
-Running the tests in ‘tests/testthat.R’ failed.
-Last 13 lines of output:
-  ── Failure ('test-get_measurements_before_drug.R:49:3'): get_measurements_before_drug works as a standalone function ──
-  ... %>% unique() not equal to "Male".
-  Lengths differ: 0 is not 1
-  ── Failure ('test-get_measurements_before_drug.R:52:3'): get_measurements_before_drug works as a standalone function ──
-  ... %>% unique() not equal to 2.
-  Lengths differ: 0 is not 1
-  ── Failure ('test-qc_functions.R:168:3'): calculate_blup_slopes works with direct lab measurement input ──
-  "X3001308_fixed_slope" %in% colnames(output_data) is not TRUE
-
-  `actual`:   FALSE
-  `expected`: TRUE
-
-  [ FAIL 6 | WARN 16 | SKIP 1 | PASS 109 ]
-  Error: Test failures
-  Execution halted
 * DONE
-Status: 1 ERROR, 2 WARNINGs, 3 NOTEs
+Status: 1 WARNING, 4 NOTEs

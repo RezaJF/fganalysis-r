@@ -145,17 +145,30 @@ get_first_purchase <- function(all_phenos, druglist, finngen_ids=NULL,
 #' @return Data frame with lab measurements and joined covariates
 #' @export
 #' @examples
+#' # Create sample data
+#' lab_measurements <- data.frame(
+#'   FINNGENID = c("FG1", "FG2", "FG3"),
+#'   OMOP_CONCEPT_ID = "3001308",
+#'   EVENT_AGE = c(50, 60, 70),
+#'   MEASUREMENT_VALUE_HARMONIZED = c(100, 110, 120)
+#' )
+#' cov_pheno <- data.frame(
+#'   FINNGENID = c("FG1", "FG2", "FG3"),
+#'   SEX = c(1, 2, 1),
+#'   AGE_AT_DEATH_OR_END_OF_FOLLOWUP = c(80, 85, 90)
+#' )
+#'
 #' # Join sex covariate to lab measurements
 #' lab_with_sex <- join_covariates_to_labs(
 #'   lab_data = lab_measurements,
-#'   covariates = conn$cov_pheno,
+#'   covariates = cov_pheno,
 #'   covariate_cols = c("SEX")
 #' )
 #'
 #' # Join multiple covariates
 #' lab_with_covariates <- join_covariates_to_labs(
 #'   lab_data = lab_measurements,
-#'   covariates = conn$cov_pheno,
+#'   covariates = cov_pheno,
 #'   covariate_cols = c("SEX", "AGE_AT_DEATH_OR_END_OF_FOLLOWUP")
 #' )
 join_covariates_to_labs <- function(lab_data, covariates, covariate_cols) {
@@ -200,10 +213,23 @@ join_covariates_to_labs <- function(lab_data, covariates, covariate_cols) {
 #' @return Data frame with joined covariates
 #' @export
 #' @examples
+#' # Create sample data
+#' drug_response_data <- data.frame(
+#'   FINNGENID = c("FG1", "FG2", "FG3"),
+#'   before = c(100, 110, 120),
+#'   after = c(95, 105, 115),
+#'   response = c(-5, -5, -5)
+#' )
+#' cov_pheno <- data.frame(
+#'   FINNGENID = c("FG1", "FG2", "FG3"),
+#'   SEX = c(1, 2, 1),
+#'   AGE_AT_DEATH_OR_END_OF_FOLLOWUP = c(80, 85, 90)
+#' )
+#'
 #' # Join covariates to drug response data
 #' response_with_covariates <- join_covariates(
-#'   data = drug_response$responses,
-#'   covariates = conn$cov_pheno,
+#'   data = drug_response_data,
+#'   covariates = cov_pheno,
 #'   covariate_cols = c("SEX", "AGE_AT_DEATH_OR_END_OF_FOLLOWUP")
 #' )
 join_covariates <- function(data, covariates, covariate_cols) {
