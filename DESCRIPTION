@@ -1,7 +1,7 @@
 Package: fganalysis
 Type: Package
 Title: Drug Response Analysis
-Version: 0.1.0
+Version: 0.2.2
 Author: Mitja Kurki
 Maintainer: Mitja Kurki <mitja.kurki@gmail.com>
 Description: A package for analyzing drug response data, including functions for data processing, summarization, and visualization of lab measurements and drug purchases.
@@ -23,7 +23,8 @@ Imports:
     lme4,
     rlang,
     grDevices,
-    utils
+    utils,
+    checkmate
 Suggests:
     testthat
 Encoding: UTF-8

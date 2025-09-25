@@ -21,30 +21,17 @@ Helper function to join covariate data to lab measurements data frame.
 This function handles the common pattern of adding covariates like sex, age, etc. to lab data.
 }
 \examples{
-# Create sample data
-lab_measurements <- data.frame(
-  FINNGENID = c("FG1", "FG2", "FG3"),
-  OMOP_CONCEPT_ID = "3001308",
-  EVENT_AGE = c(50, 60, 70),
-  MEASUREMENT_VALUE_HARMONIZED = c(100, 110, 120)
-)
-cov_pheno <- data.frame(
-  FINNGENID = c("FG1", "FG2", "FG3"),
-  SEX = c(1, 2, 1),
-  AGE_AT_DEATH_OR_END_OF_FOLLOWUP = c(80, 85, 90)
-)
-
 # Join sex covariate to lab measurements
 lab_with_sex <- join_covariates_to_labs(
   lab_data = lab_measurements,
-  covariates = cov_pheno,
+  covariates = conn$cov_pheno,
   covariate_cols = c("SEX")
 )
 
 # Join multiple covariates
 lab_with_covariates <- join_covariates_to_labs(
   lab_data = lab_measurements,
-  covariates = cov_pheno,
+  covariates = conn$cov_pheno,
   covariate_cols = c("SEX", "AGE_AT_DEATH_OR_END_OF_FOLLOWUP")
 )
 }

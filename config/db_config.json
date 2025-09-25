@@ -22,7 +22,7 @@
     "vnr": {
         "path": "/mnt/nfs/R13/finngen_vnr_2.0/VNR_fi_2.0_dedup.tsv",
         "type": "tsv",
-        "recodings": [{"column": "VNR", "function": "as.character"}]
+        "recodings": [{"column":"VNR", "function": "as.character"}]
     },
     "long_anthropometric": {
         "path": "/mnt/nfs/R13/finngen_R13_hilmo_avohilmo_extended_1.0_dedup_fixbp.parquet",

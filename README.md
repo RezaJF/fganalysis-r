@@ -51,6 +51,13 @@ To use this package, you can install it from a local source. First, ensure you h
 
 # Set MAKEFLAGS for faster compilation if installing from source
 Sys.setenv(MAKEFLAGS = "-j4")
+## if installing from source, install devtools and
+devtools::install("path/to/fganalysis")
+
+## in sandbox, you can just
+library(devtools)
+load_all("/finngen/shared_nfs/finngen/code/fganalysis/")
+conn <- connect_fgdata("/finngen/shared_nfs/finngen/code/fganalysis/config/db_config_sb.json")
 
 # Install the package from its local directory
 devtools::install("path/to/fganalysis-r")
@@ -127,6 +134,29 @@ To establish a connection, pass the path to your configuration file to `connect_
 ```R
 # The path can be relative or absolute
 # In the FinnGen Sandbox, a pre-configured file is available
+=======
+## Usage
+
+### Functions
+
+The package includes several key functions:
+
+- `create_drug_response()`: Generates a drug response dataset based on lab measurements and drug purchases.
+- `summarize_drug_response()`: Creates a summary PDF and text tables of drug response data.
+- `get_lab_measurements` and `get_drug_purchases` to query for lab values and purchases.
+
+## Examples
+
+Here is a simple example of how to use the package:
+
+```R
+# Load the package
+
+load_all("/finngen/shared_nfs/finngen/code/fganalysis/")
+## get connection to data sources. in sanbox you can find data source configuration in /finngen/shared_nfs/finngen/code/drugResponsePackage/config/db_config_sb.json
+conn <- connect_fgdata("config/db_config.json")
+### SANDBOX
+>>>>>>> master
 conn <- connect_fgdata("/finngen/shared_nfs/finngen/code/drugResponsePackage/config/db_config_sb.json")
 
 # Or using a local config file
@@ -168,14 +198,28 @@ dr <- get_drug_purchases(conn$pheno, c("L01B"))
 ## Here defining pre-measurements drug measurements to be 1 year before drug and
 ## after period to be 1 month to 1 year.
 before_period <- c(-1, 0)
-after_period <- c(1/12, 1)
+after_period <- c(3/12, 1)
 
+<<<<<<< HEAD
 ## Create a dataframe containing LDL (omopid 3001308) response to first statin purchase (ATC codes starting with A10) for each finngen ID
 resp <- create_drug_response(conn, c("3001308"),
                              druglist = c("A10"),
                              before_period,
                              after_period,
                              remove_outliers_sd = 3)  # Optional: remove outliers
+=======
+## create a dataframe containing LDL (omopid 3001308) response to first statin purchase (ATC codes starting with C10AA) for each finngen ID  
+## you can filter min/max values by providing vector of length 2 specifying min and max lab values values accepted
+min_max <- c(0,20)
+resp <- create_drug_response(conn,c("3001308"), 
+                             druglist=c("C10AA"),before_period,after_period,
+                              filter_min_max=min_max)
+## create plots and tables of the respons
+summarize_drug_response(resp, out_file_prefix="3001308_C10AA_resp")
+
+
+
+>>>>>>> master
 
 ## Create plots and tables of the response
 summarize_drug_response(resp, out_file_prefix = "3001308_A10_resp")

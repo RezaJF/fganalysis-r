@@ -37,24 +37,18 @@ Creates a mock connection object using data frames instead of database connectio
 This is useful for testing, development, and when working with small datasets that can fit in memory.
 }
 \examples{
+
 # Create minimal mock connection
 mock_conn <- create_mock_connection(
   pheno_data = data.frame(FINNGENID = "FG1", EVENT_AGE = 50, CODE1 = "A01", SOURCE = "PURCH"),
   labs_data = data.frame(FINNGENID = "FG1", EVENT_AGE = 49, MEASUREMENT_VALUE_HARMONIZED = 100, OMOP_CONCEPT_ID = "L1")
 )
 
-# Create comprehensive mock connection with additional data
-pheno_data <- data.frame(FINNGENID = c("FG1", "FG2"), EVENT_AGE = c(50, 60), 
-                        CODE1 = c("A01", "A02"), SOURCE = c("PURCH", "PURCH"))
-labs_data <- data.frame(FINNGENID = c("FG1", "FG2"), EVENT_AGE = c(49, 59), 
-                       MEASUREMENT_VALUE_HARMONIZED = c(100, 110), OMOP_CONCEPT_ID = c("L1", "L1"))
-minimum_data <- data.frame(FINNGENID = c("FG1", "FG2"), SEX = c(1, 2))
-cov_data <- data.frame(FINNGENID = c("FG1", "FG2"), AGE_AT_DEATH = c(80, 85))
-
+# Create comprehensive mock connection
 mock_conn_full <- create_mock_connection(
-  pheno_data = pheno_data,
-  labs_data = labs_data,
-  minimum_data = minimum_data,
-  cov_pheno_data = cov_data
+  pheno_data = pheno_df,
+  labs_data = labs_df,
+  minimum_data = minimum_df,
+  cov_pheno_data = cov_df
 )
 }

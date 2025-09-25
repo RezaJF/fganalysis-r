@@ -15,9 +15,17 @@
         "path": "/finngen/shared_nfs/R13/phenos/R13_COV_PHENO_V0.parquet",
         "type": "parquet"
     },
+    "endpoint": {
+        "path": "/finngen/shared_nfs/R13/phenos/finngen_R13_endpoint_2.0_longformat.parquet",
+        "type": "parquet"
+    },
     "vnr":{
         "path":  "/finngen/shared_nfs/R13/phenos/VNR_fi_2.0_dedup.tsv",
         "type": "tsv",
         "recodings": [{"column":"VNR", "function": "as.character"}]
+    },
+    "long_anthropometric": {
+        "path": "/finngen/shared_nfs/R13/phenos/finngen_R13_hilmo_avohilmo_extended_1.0_dedup_fixbp.parquet",
+        "type": "parquet"
     }
 }
