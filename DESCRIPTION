@@ -18,9 +18,16 @@ Imports:
     rjson,
     DBI,
     data.table,
+    UpSetR,
+    tidyr,
+    lme4,
+    rlang,
+    grDevices,
+    utils,
     checkmate
 Suggests:
     testthat
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.3.2
+
