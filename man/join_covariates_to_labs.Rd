@@ -26,7 +26,7 @@ lab_measurements <- data.frame(
   FINNGENID = c("FG1", "FG2", "FG3"),
   OMOP_CONCEPT_ID = "3001308",
   EVENT_AGE = c(50, 60, 70),
-  MEASUREMENT_VALUE_HARMONIZED = c(100, 110, 120)
+  VALUE = c(100, 110, 120)
 )
 cov_pheno <- data.frame(
   FINNGENID = c("FG1", "FG2", "FG3"),

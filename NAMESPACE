@@ -39,13 +39,10 @@ import(rjson)
 import(stringr)
 import(tidyr)
 import(utils)
-<<<<<<< HEAD
 importFrom(checkmate,assertCharacter)
 importFrom(checkmate,assertClass)
 importFrom(checkmate,assertLogical)
 importFrom(checkmate,assertNumeric)
-=======
->>>>>>> master
 importFrom(data.table,fread)
 importFrom(dplyr,"%>%")
 importFrom(dplyr,all_of)

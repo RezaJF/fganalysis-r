@@ -39,7 +39,7 @@ inverse_rank_normalize <- function(x) {
 
 #' @title Calculate Fixed-Effect Slopes
 #' @description Calculates individual-specific slopes using simple linear regression
-#' @param data Data frame with columns: FINNGENID, EVENT_AGE, MEASUREMENT_VALUE_HARMONIZED
+#' @param data Data frame with columns: FINNGENID, EVENT_AGE, VALUE
 #' @param min_measurements Minimum number of measurements per individual (default: 2)
 #' @return Data frame with FINNGENID and fixed_slope columns
 #' @export
@@ -51,7 +51,7 @@ calculate_fixed_slopes <- function(data, min_measurements = 2) {
       n_measurements = n(),
       fixed_slope = if(n() >= min_measurements) {
         tryCatch({
-          lm(.data$MEASUREMENT_VALUE_HARMONIZED ~ .data$EVENT_AGE)$coefficients[2]
+          lm(.data$VALUE ~ .data$EVENT_AGE)$coefficients[2]
         }, error = function(e) NA_real_)
       } else {
         NA_real_
@@ -301,7 +301,7 @@ winsorize_vector <- function(x, winsorize_pct = 0.01) {
 #' that are less than a specified number of months apart and replaces each cluster with a single
 #' representative measurement (mean age, median value). All other columns are carried over by
 #' taking the first value in each cluster.
-#' @param df A data frame for a single individual, containing EVENT_AGE and MEASUREMENT_VALUE_HARMONIZED.
+#' @param df A data frame for a single individual, containing EVENT_AGE and VALUE.
 #' Any additional columns will be preserved by taking the first value in each cluster.
 #' @param min_interval_months The minimum interval in months. Measurements closer than this will be clustered. Defaults to 6.
 #' @return A data frame with smoothed measurement intervals, preserving all original columns.
@@ -326,9 +326,9 @@ smooth_measurement_intervals <- function(df, min_interval_months = 6) {
     group_by(.data$cluster_id) %>%
     summarise(
       EVENT_AGE = mean(.data$EVENT_AGE, na.rm = TRUE),
-      MEASUREMENT_VALUE_HARMONIZED = median(.data$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE),
+      VALUE = median(.data$VALUE, na.rm = TRUE),
       # Carry over all other columns, taking the first value in the cluster
-      across(-c(EVENT_AGE, MEASUREMENT_VALUE_HARMONIZED, time_diff), first),
+      across(-c(EVENT_AGE, VALUE, time_diff), first),
       .groups = "drop"
     ) %>%
     select(-cluster_id)

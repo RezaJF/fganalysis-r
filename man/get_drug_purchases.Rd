@@ -5,28 +5,27 @@
 \title{Get drug purchases from FinnGen data}
 \usage{
 get_drug_purchases(
-  all_phenos,
+  conn,
   druglist,
   finngen_ids = NULL,
-<<<<<<< HEAD
   use_only_reimbursement = FALSE,
-=======
   return_cols = c("FINNGENID", "EVENT_AGE", ATC = "CODE1", REIMB_CODE = "CODE2", VNR =
     "CODE3", N_PACKS = "CODE4"),
->>>>>>> master
   lazy = FALSE
 )
 }
 \arguments{
-\item{all_phenos}{data frame with drug purchases}
-
 \item{druglist}{vector of drug ATC codes. The ATC codes are matched with the first part of the code (e.g. A01*)}
 
 \item{finngen_ids}{vector of FINNGENIDs to filter the data. leave empty to get all}
 
 \item{use_only_reimbursement}{logical, if TRUE, use only reimbursement data (default FALSE) and combine reimbursement and delivery data if available in conn}
 
+\item{return_cols}{vector of column names to return}
+
 \item{lazy}{logical, if TRUE, return a lazy tbl object}
+
+\item{all_phenos}{finngen data connection object}
 }
 \value{
 data frame with drug purchases

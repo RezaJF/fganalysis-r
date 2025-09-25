@@ -6,12 +6,12 @@ library(testthat)
 # Test the drug.response function
 test_that("drug.response creates the correct object", {
     response <- data.frame(FINNGENID = c(1, 2), response = c(1, 2))
-    lab_measurements <- data.frame(FINNGENID = c(1, 2), MEASUREMENT_VALUE_HARMONIZED = c(10, 20))
+    lab_measurements <- data.frame(FINNGENID = c(1, 2), VALUE = c(10, 20))
     drug_purchases <- data.frame(FINNGENID = c(1, 2), ATC = c("A01", "A02"))
 
     result <- drug.response(response, lab_measurements, drug_purchases, c(-1, -0.5), c(0.5, 1))
 
-    expect_s3_class(result, "drug.reponse")
+    expect_s3_class(result, "drug.response")
     expect_equal(result$response, response)
     expect_equal(result$all_measurements, lab_measurements)
     expect_equal(result$all_drug_purchases, drug_purchases)
@@ -55,7 +55,7 @@ test_that("create_drug_response returns the correct structure", {
         OMOP_CONCEPT_ID = c("lab1", "lab1", "lab1", "lab1", "lab2", "lab2", "lab2", "lab2", "lab2", "lab2"),
         EVENT_AGE = c(20.6, 20.7, 20.8, 21.5, 19.5, 19.6, 19.7, 20.5, 25, 25.5),
         MEASUREMENT_VALUE_HARMONIZED = c(15, 16.6, 17, 25, 8, 9.5, 10, 40, 50, 38),
-        MEASUREMENT_VALUE_MERGED = c(15, 16, 17, 25, 8, 9, 10, 40, 50, 38)
+        MEASUREMENT_VALUE_MERGED = c(15, 16.6, 17, 25, 8, 9.5, 10, 40, 50, 38)
     )
 
     drug_events <- data.frame(
@@ -85,29 +85,28 @@ test_that("create_drug_response returns the correct structure", {
 
     result <- create_drug_response(conn, lablist, druglist, c(-1, 0), c(0.1, 1))
     print(result$responses)
-    expect_s3_class(result, "drug.reponse")
+    expect_s3_class(result, "drug.response")
     filtres <- result$responses %>% filter(!is.na(response))
     expect_equal(nrow(result$responses %>% filter(!is.na(response))), 2)
     expect_equal(filtres$FINNGENID, c("FG1", "FG2"))
-    expect_equal(filtres$before, c(16, 9))
+    expect_equal(filtres$before, c(16.6, 9.5))
     expect_equal(filtres$after, c(25, 40))
-    expect_equal(filtres$response, c(9, 31))
+    expect_equal(filtres$response, c(8.4, 30.5))
 
 
-    result <- create_drug_response(conn, lablist, druglist, c(-1, 0), c(0.1, 1),, use_only_reimbursement_drugs = TRUE)
-    print(result$responses)
-    expect_s3_class(result, "drug.reponse")
+    result <- create_drug_response(conn, lablist, druglist, c(-1, 0), c(0.1, 1), use_only_reimbursement_drugs = TRUE)
+    expect_s3_class(result, "drug.response")
     filtres <- result$responses %>% filter(!is.na(response))
     expect_equal(nrow(result$responses %>% filter(!is.na(response))), 1)
     expect_equal(filtres$FINNGENID, c("FG2"))
-    expect_equal(filtres$before, c(9))
+    expect_equal(filtres$before, c(9.5))
     expect_equal(filtres$after, c(40))
-    expect_equal(filtres$response, c(31))
+    expect_equal(filtres$response, c(30.5))
 
 
     result <- create_drug_response(conn, lablist, druglist, c(-1, 0), c(0.1, 1), use_lab_free_text_values = FALSE)
     filtres <- result$responses %>% filter(!is.na(response))
-    expect_s3_class(result, "drug.reponse")
+    expect_s3_class(result, "drug.response")
     expect_equal(nrow(filtres), 2)
     expect_equal(filtres$FINNGENID, c("FG1", "FG2"))
     expect_equal(filtres$before, c(16.6, 9.5))

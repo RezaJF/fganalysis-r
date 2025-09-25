@@ -20,16 +20,14 @@ get_lab_measurements(
 
 \item{require_values}{logical, if TRUE, only return rows with non-missing VALUE}
 
-\item{use_freetext_values}{logical, if False, use only MEASUREMENT_VALUE_HARMONIZED column for lab values and not combining from reported values and extracted from free text
-(default True)}
+\item{use_freetext_values}{logical, if TRUE, use lab measurement also from result free text column}
 
 \item{finngen_ids}{vector of FINNGENIDs to filter the data}
 
 \item{lazy}{logical, if TRUE, return a lazy tbl object}
 }
 \value{
-data frame with lab measurements, lab value will be in column named VALUE, regardless of original column name 
-(e.g. MEASUREMENT_VALUE_HARMONIZED or MEASUREMENT_VALUE_MERGED)
+data frame with lab measurements
 }
 \description{
 Get lab measurements from FinnGen data

@@ -1,8 +1,8 @@
 #' @title Get lab measurements from FinnGen data
 #' @param all_labs data frame with lab measurements
 #' @param lablist vector of lab measurement concept IDs
-#' @param require_values logical, if TRUE, only return rows with non-missing MEASUREMENT_VALUE_HARMONIZED
-#' @param return_cols vector of column names to return
+#' @param require_values logical, if TRUE, only return rows with non-missing VALUE
+#' @param use_freetext_values logical, if TRUE, use lab measurement also from result free text column
 #' @param finngen_ids vector of FINNGENIDs to filter the data
 #' @param lazy logical, if TRUE, return a lazy tbl object
 #' @return data frame with lab measurements
@@ -10,10 +10,20 @@
 #' @importFrom dplyr %>% filter select collect all_of mutate
 #' @import stringr
 get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
-                                 return_cols=c("FINNGENID","OMOP_CONCEPT_ID", "EVENT_AGE", "MEASUREMENT_VALUE_HARMONIZED"),
+                                  use_freetext_values = TRUE,
                                  finngen_ids=NULL, lazy=FALSE) {
 
-  return_cols <- unique(c("OMOP_CONCEPT_ID", return_cols))
+    if(! use_freetext_values){
+        print("Using only MEASUREMENT_VALUE_HARMONIZED column for lab values and not combining from reported values and extracted from free text")
+        lab_value_column <- "MEASUREMENT_VALUE_HARMONIZED"
+    }
+    else {
+        print("Using MEASUREMENT_VALUE_MERGED column for lab values, which combines reported values and those extracted from free text")
+        lab_value_column <- "MEASUREMENT_VALUE_MERGED"
+    }
+
+    return_cols <- c("OMOP_CONCEPT_ID","FINNGENID", "OMOP_CONCEPT_ID", "EVENT_AGE", "VALUE"=lab_value_column)
+
 
   # Ensure robust matching regardless of column/vector types (character vs numeric)
   # The OMOP_CONCEPT_ID column may be stored as DECIMAL in the parquet file
@@ -32,7 +42,7 @@ get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
     labs <- labs %>% dplyr::filter(.data$FINNGENID %in% finngen_ids)
   }
   if (require_values) {
-    labs <- labs %>% dplyr::filter(!is.na(.data$MEASUREMENT_VALUE_HARMONIZED))
+    labs <- labs %>% dplyr::filter(!is.na(.data$VALUE))
   }
 
   if (lazy) {
@@ -44,9 +54,10 @@ get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
 
 
 #' @title Get drug purchases from FinnGen data
-#' @param all_phenos data frame with drug purchases
+#' @param all_phenos finngen data connection object
 #' @param druglist vector of drug ATC codes. The ATC codes are matched with the first part of the code (e.g. A01*)
 #' @param finngen_ids vector of FINNGENIDs to filter the data. leave empty to get all
+#' @param use_only_reimbursement logical, if TRUE, use only reimbursement data (default FALSE) and combine reimbursement and delivery data if available in conn
 #' @param return_cols vector of column names to return
 #' @param lazy logical, if TRUE, return a lazy tbl object
 #' @return data frame with drug purchases
@@ -54,81 +65,73 @@ get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
 #' @importFrom dplyr %>% filter select collect rename
 #' @importFrom rlang sym :=
 #' @import stringr
-get_drug_purchases <- function(all_phenos, druglist, finngen_ids=NULL,
-                               return_cols=c("FINNGENID","EVENT_AGE", ATC="CODE1", REIMB_CODE="CODE2", VNR="CODE3", N_PACKS="CODE4"),
+get_drug_purchases <- function(conn, druglist, finngen_ids=NULL,use_only_reimbursement = FALSE,
                                lazy=FALSE) {
 
-  drugs_regex <- paste0("^(",
+    ## check that conn is a fg_data_connection object and has pheno data name
+    if (!inherits(conn, "fg_data_connection")) {
+        stop("conn must be a fg_data_connection object")
+    }
+
+    if (!"pheno" %in% names(conn)) {
+        stop("conn must contain 'pheno' data")
+    }
+
+    drugs_regex <- paste0("^(",
                         paste0(druglist, collapse = '|'),
-                      ")")
+                        ")")
 
-    drugs <- all_phenos %>% dplyr::filter(.data$SOURCE=="PURCH" & str_detect(.data$CODE1, drugs_regex))
 
-  # Handle column selection and renaming
-  if (is.null(names(return_cols))) {
-    # No renaming, just use columns as is
-    available_cols <- intersect(return_cols, colnames(drugs))
-    drugs <- drugs %>% select(all_of(available_cols))
-  } else {
-    # Handle renaming - extract actual column names and rename mapping
-    actual_cols <- c()
-    rename_map <- list()
+    all_phenos <- conn$pheno
 
-    for (i in seq_along(return_cols)) {
-      if (names(return_cols)[i] == "") {
-        # No rename, just select
-        actual_cols <- c(actual_cols, return_cols[i])
-      } else {
-        # Rename from value to name
-        actual_cols <- c(actual_cols, return_cols[i])
-        rename_map[[names(return_cols)[i]]] <- return_cols[i]
-      }
+    if ("drug_events" %in% names(conn) & !use_only_reimbursement) {
+        print("Using drug data combining reimbursement and delivery data.")
+        drugs <- conn$drug_events %>% 
+                dplyr::filter( str_detect( .data$ATC, drugs_regex ) ) 
+    } else {
+        print("Using drug data from reimbursement data only! i.e. longitudinal data from purchase registry.")
+        return_cols <- c("FINNGENID", "EVENT_AGE", "APPROX_EVENT_DAY", ATC = "CODE1", REIMB_CODE = "CODE2", VNR = "CODE3", N_PACKS = "CODE4")
+        drugs <- all_phenos %>%
+            dplyr::filter(.data$SOURCE == "PURCH" & str_detect( .data$CODE1, drugs_regex )) %>%
+            select(all_of(return_cols))
     }
 
-    # Select only available columns
-    available_cols <- intersect(actual_cols, colnames(drugs))
-    drugs <- drugs %>% select(all_of(available_cols))
 
-    # Apply renaming for columns that exist
-    for (new_name in names(rename_map)) {
-      old_name <- rename_map[[new_name]]
-      if (old_name %in% colnames(drugs)) {
-        drugs <- drugs %>% rename(!!sym(new_name) := !!sym(old_name))
-      }
+    if (!is.null(finngen_ids)) {
+        drugs <- drugs %>% dplyr::filter(.data$FINNGENID %in% finngen_ids)
     }
-  }
 
-  if (!is.null(finngen_ids)) {
-    drugs <- drugs %>% dplyr::filter(.data$FINNGENID %in% finngen_ids)
-  }
+    if ("vnr" %in% names(conn)) {
+        columns <- c("VNR", "Substance", "MedicineName", "PackageSize", "DDDPerPack", "Dosage", "DosageUnit")
+        vnr <- conn$vnr %>% select(all_of(columns))
+        drugs <- left_join(drugs, vnr, by = "VNR", copy = TRUE)
+    }
 
-  if (lazy) {
-    drugs
-  } else {
-    dplyr::collect(drugs)
-  }
+    if (lazy) {
+        drugs
+    } else {
+        dplyr::collect(drugs)
+    }
 }
 
 
 #' @title Get first drug purchase from FinnGen data
-#' @param all_phenos data frame with drug purchases
+#' @param conn finngen data connection object
 #' @param druglist vector of drug ATC codes. The ATC codes are matched with the first part of the code (e.g. A01*)
 #' @param finngen_ids vector of FINNGENIDs to filter the data. leave empty to get all
-#' @param return_cols vector of column names to return
+#' @param use_only_reimbursement logical, if TRUE, use only reimbursement data (default FALSE) and combine reimbursement and delivery data if available in conn
 #' @param lazy logical, if TRUE, return a lazy tbl object
 #' @return data frame with first drug purchases for each FINNGENID
 #' @export
 #' @importFrom dplyr %>% group_by filter distinct ungroup select collect
-get_first_purchase <- function(all_phenos, druglist, finngen_ids=NULL,
-                               return_cols=c("FINNGENID","EVENT_AGE","CODE1"),
+get_first_purchase <- function(conn, druglist, finngen_ids=NULL,
+                                use_only_reimbursement = FALSE,
                                lazy=FALSE) {
 
-  first_purch <- get_drug_purchases(all_phenos, druglist, finngen_ids, return_cols, lazy=TRUE) %>%
+  first_purch <- get_drug_purchases(conn, druglist, finngen_ids, lazy=TRUE, use_only_reimbursement = use_only_reimbursement) %>%
     group_by(.data$FINNGENID) %>%
     filter(.data$EVENT_AGE == min(.data$EVENT_AGE)) %>% distinct(.data$EVENT_AGE, .keep_all = TRUE) %>%
-    ungroup() %>%
-    select(all_of(return_cols))
-
+    ungroup()
   if (lazy) {
     first_purch
   } else {
@@ -150,7 +153,7 @@ get_first_purchase <- function(all_phenos, druglist, finngen_ids=NULL,
 #'   FINNGENID = c("FG1", "FG2", "FG3"),
 #'   OMOP_CONCEPT_ID = "3001308",
 #'   EVENT_AGE = c(50, 60, 70),
-#'   MEASUREMENT_VALUE_HARMONIZED = c(100, 110, 120)
+#'   VALUE = c(100, 110, 120)
 #' )
 #' cov_pheno <- data.frame(
 #'   FINNGENID = c("FG1", "FG2", "FG3"),

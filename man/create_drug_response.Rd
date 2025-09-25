@@ -10,16 +10,12 @@ create_drug_response(
   druglist,
   before_period,
   after_period,
-<<<<<<< HEAD
   summary_function = median,
   filter_min_max = c(-Inf, Inf),
-  finngen_ids = NULL,
   use_lab_free_text_values = TRUE,
-  use_only_reimbursement_drugs = FALSE
-=======
+  use_only_reimbursement_drugs = FALSE,
   finngen_ids = NULL,
   remove_outliers_sd = NULL
->>>>>>> master
 )
 }
 \arguments{
@@ -33,21 +29,17 @@ create_drug_response(
 
 \item{after_period}{A numeric vector of length 2 defining the after period (e.g., c(0.1, 1) for 0.1 to 1 year after drug)}
 
-<<<<<<< HEAD
-\item{summary_function}{function to summarize the lab measurements (default is median, use mean for mean etc.)}
+\item{summary_function}{A function to summarize the lab measurements (default is median)}
 
-\item{filter_min_max}{vector of length 2, min and max values to filter lab measurements (default c(-Inf, Inf))}
+\item{filter_min_max}{A numeric vector of length 2 defining min and max lab values to include (default: c(-Inf, Inf))}
 
-\item{finngen_ids}{vector of FINNGENIDs to filter the data}
+\item{use_lab_free_text_values}{Logical, if False, Dont include lab measurements from free text value column (default: TRUE)}
 
-\item{use_lab_free_text_values}{logical, if TRUE, use lab measurements combining reported values and those from free text values (default TRUE)}
+\item{use_only_reimbursement_drugs}{Logical, if TRUE, use only reimbursement data (default FALSE) and do not include delivery data from KANTA}
 
-\item{use_only_reimbursement_drugs}{logical, if TRUE, use only reimbursement data (i.e. longitudinal data from purchase registry) (default FALSE)}
-=======
 \item{finngen_ids}{Optional character vector of FINNGENIDs to restrict analysis}
 
 \item{remove_outliers_sd}{Optional numeric value (1-6) to remove outliers based on standard deviations}
->>>>>>> master
 }
 \value{
 drug.response object

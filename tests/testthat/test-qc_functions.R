@@ -35,7 +35,7 @@ test_that("calculate_fixed_slopes works correctly", {
   test_data <- data.frame(
     FINNGENID = rep(c("ID1", "ID2", "ID3"), each = 10),
     EVENT_AGE = rep(1:10, 3),
-    MEASUREMENT_VALUE_HARMONIZED = c(
+    VALUE = c(
       1:10 + rnorm(10, 0, 0.5),  # Positive slope
       20 - 1:10 + rnorm(10, 0, 0.5),  # Negative slope
       rep(15, 10) + rnorm(10, 0, 0.5)  # No slope
@@ -126,10 +126,10 @@ test_that("calculate_blup_slopes works with direct lab measurement input", {
   individual_slopes <- runif(n_individuals, -0.5, 0.5)
   individual_intercepts <- runif(n_individuals, 2, 5)
 
-  test_lab_data$MEASUREMENT_VALUE_HARMONIZED <- NA
+  test_lab_data$VALUE <- NA
   for (i in 1:n_individuals) {
     idx <- test_lab_data$FINNGENID == paste0("ID", i)
-    test_lab_data$MEASUREMENT_VALUE_HARMONIZED[idx] <-
+    test_lab_data$VALUE[idx] <-
       individual_intercepts[i] +
       individual_slopes[i] * test_lab_data$EVENT_AGE[idx] +
       rnorm(sum(idx), 0, 0.2)
