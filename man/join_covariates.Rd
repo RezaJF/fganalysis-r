@@ -20,7 +20,7 @@ Data frame with joined covariates
 Generic helper function to join covariate data to any data frame with FINNGENID.
 }
 \examples{
-Join covariates to drug response data
+# Join covariates to drug response data
 response_with_covariates <- join_covariates(
   data = drug_response$responses,
   covariates = conn$cov_pheno,

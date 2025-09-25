@@ -21,14 +21,14 @@ Helper function to join covariate data to lab measurements data frame.
 This function handles the common pattern of adding covariates like sex, age, etc. to lab data.
 }
 \examples{
-Join sex covariate to lab measurements
+# Join sex covariate to lab measurements
 lab_with_sex <- join_covariates_to_labs(
   lab_data = lab_measurements,
   covariates = conn$cov_pheno,
   covariate_cols = c("SEX")
 )
 
-Join multiple covariates
+# Join multiple covariates
 lab_with_covariates <- join_covariates_to_labs(
   lab_data = lab_measurements,
   covariates = conn$cov_pheno,
