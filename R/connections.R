@@ -1,4 +1,8 @@
 #' @import DBI
+#' @import duckdb
+#' @import duckdbfs
+#' @import bigrquery
+#' @import rjson
 #' @importFrom data.table fread
 #NULL
 get_bigquery_dbplyr <- function(projectid,dataset, table) {
@@ -27,7 +31,7 @@ fg_data_connection <- function(connections) {
     if (!all(c("pheno", "labs") %in% names(connections))) {
         stop("Connections list must contain 'pheno' and 'labs'")
     }
-    ## do further checks on the connections as needed. 
+    ## do further checks on the connections as needed.
     class(connections) <- "fg_data_connection"
     return(connections)
 }
@@ -49,18 +53,39 @@ call_connect <- function(conf) {
     req_tags <- c("path", "type")
     if (!all(req_tags %in% names(conf))) {
         stop(paste("Configuration must contain these tag [", paste(req_tags,collapse=","),"]"))
-    }    
+    }
 
     path <- conf$path
     typestring <- conf$type
 
     if (typestring == "parquet") {
-        dat <- (duckdbfs::open_dataset(path, format="parquet"))
+        # Use duckdb directly to avoid extension loading issues
+        dat <- tryCatch({
+            # Try duckdbfs first with disabled extensions
+            options(duckdb.allow_unsigned_extensions = FALSE)
+            duckdbfs::open_dataset(path, format="parquet")
+        }, error = function(e) {
+            # Fallback to direct duckdb connection if duckdbfs fails
+            message("duckdbfs failed, using direct duckdb connection")
+            conn <- dbConnect(duckdb::duckdb())
+            tbl(conn, paste0("read_parquet('", path, "')"))
+        })
     } else if (typestring == "parquet-hive") {
-        dat <- (duckdbfs::open_dataset(path, format="parquet", hive_style=TRUE))
-    } else if (typestring == "tsv") 
+        # Use duckdb directly to avoid extension loading issues
+        dat <- tryCatch({
+            # Try duckdbfs first with disabled extensions
+            options(duckdb.allow_unsigned_extensions = FALSE)
+            duckdbfs::open_dataset(path, format="parquet", hive_style=TRUE)
+        }, error = function(e) {
+            # Fallback to direct duckdb connection if duckdbfs fails
+            message("duckdbfs failed, using direct duckdb connection for hive-style parquet")
+            conn <- dbConnect(duckdb::duckdb())
+            # Hive-style parquet with one level of partitioning (SOURCE=*)
+            tbl(conn, paste0("read_parquet('", path, "/*/*.parquet', hive_partitioning=true)"))
+        })
+    } else if (typestring == "tsv")
     {
-        dat <- fread(path, sep="\t") 
+        dat <- fread(path, sep="\t")
     } else {
         stop(paste("Unsupported connection type given in configuration file:", typestring,
                    ". Supported types are: parquet, parquet-hive, tsv"))
@@ -75,7 +100,7 @@ call_connect <- function(conf) {
             column <- recoding$column
             function_name <- recoding[["function"]]
             print(function_name)
-            
+
             dat[[column]] <- do.call(function_name, list(dat[[column]]))
         }
     }
@@ -86,7 +111,7 @@ call_connect <- function(conf) {
 #' @param path_to_conf Path to the configuration file (JSON format)
 #' @return A fg.data.connection object containing the connections to data
 #' @export
-connect_fgdata <-  function(path_to_conf) { 
+connect_fgdata <-  function(path_to_conf) {
     json_data <- rjson::fromJSON(file = path_to_conf)
     req_confs <- c("pheno", "labs")
     connections <- list()
@@ -100,6 +125,76 @@ connect_fgdata <-  function(path_to_conf) {
     }
 
     return(fg_data_connection( connections))
+}
+
+#' Create a mock fg_data_connection object for testing
+#' @description Creates a mock connection object using data frames instead of database connections.
+#' This is useful for testing, development, and when working with small datasets that can fit in memory.
+#' @param pheno_data Data frame containing phenotype data (required)
+#' @param labs_data Data frame containing lab measurement data (required)
+#' @param minimum_data Optional data frame containing minimum phenotype data
+#' @param cov_pheno_data Optional data frame containing covariate phenotype data
+#' @param endpoint_data Optional data frame containing endpoint data
+#' @param vnr_data Optional data frame containing VNR data
+#' @param long_anthropometric_data Optional data frame containing longitudinal anthropometric data
+#' @return A fg_data_connection object that can be used with package functions
+#' @export
+#' @examples
+#' 
+#' # Create minimal mock connection
+#' mock_conn <- create_mock_connection(
+#'   pheno_data = data.frame(FINNGENID = "FG1", EVENT_AGE = 50, CODE1 = "A01", SOURCE = "PURCH"),
+#'   labs_data = data.frame(FINNGENID = "FG1", EVENT_AGE = 49, MEASUREMENT_VALUE_HARMONIZED = 100, OMOP_CONCEPT_ID = "L1")
+#' )
+#'
+#' # Create comprehensive mock connection with additional data
+#' pheno_data <- data.frame(FINNGENID = c("FG1", "FG2"), EVENT_AGE = c(50, 60),
+#'                         CODE1 = c("A01", "A02"), SOURCE = c("PURCH", "PURCH"))
+#' labs_data <- data.frame(FINNGENID = c("FG1", "FG2"), EVENT_AGE = c(49, 59),
+#'                        MEASUREMENT_VALUE_HARMONIZED = c(100, 110), OMOP_CONCEPT_ID = c("L1", "L1"))
+#' minimum_data <- data.frame(FINNGENID = c("FG1", "FG2"), SEX = c(1, 2))
+#' cov_data <- data.frame(FINNGENID = c("FG1", "FG2"), AGE_AT_DEATH = c(80, 85))
+#'
+#' mock_conn_full <- create_mock_connection(
+#'   pheno_data = pheno_data,
+#'   labs_data = labs_data,
+#'   minimum_data = minimum_data,
+#'   cov_pheno_data = cov_data
+#' )
+create_mock_connection <- function(pheno_data, labs_data,
+                                  minimum_data = NULL, cov_pheno_data = NULL,
+                                  endpoint_data = NULL, vnr_data = NULL,
+                                  long_anthropometric_data = NULL) {
+
+  # Validate required data
+  if (is.null(pheno_data) || is.null(labs_data)) {
+    stop("pheno_data and labs_data are required")
+  }
+
+  # Create connections list with required data
+  connections <- list(
+    pheno = pheno_data,
+    labs = labs_data
+  )
+
+  # Add optional data if provided
+  if (!is.null(minimum_data)) {
+    connections$minimum <- minimum_data
+  }
+  if (!is.null(cov_pheno_data)) {
+    connections$cov_pheno <- cov_pheno_data
+  }
+  if (!is.null(endpoint_data)) {
+    connections$endpoint <- endpoint_data
+  }
+  if (!is.null(vnr_data)) {
+    connections$vnr <- vnr_data
+  }
+  if (!is.null(long_anthropometric_data)) {
+    connections$long_anthropometric <- long_anthropometric_data
+  }
+
+  return(fg_data_connection(connections))
 }
 
 

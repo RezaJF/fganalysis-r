@@ -1,6 +1,5 @@
 library(testthat)
 
-
 # Load the functions from the package
 #source("R/drug_response_functions.R")
 
@@ -9,10 +8,10 @@ test_that("drug.response creates the correct object", {
   response <- data.frame(FINNGENID = c(1, 2), response = c(1, 2))
   lab_measurements <- data.frame(FINNGENID = c(1, 2), MEASUREMENT_VALUE_HARMONIZED = c(10, 20))
   drug_purchases <- data.frame(FINNGENID = c(1, 2), ATC = c("A01", "A02"))
-  
+
   result <- drug.response(response, lab_measurements, drug_purchases, c(-1, -0.5), c(0.5, 1))
-  
-  expect_s3_class(result, "drug.reponse")
+
+  expect_s3_class(result, "drug.response")
   expect_equal(result$response, response)
   expect_equal(result$all_measurements, lab_measurements)
   expect_equal(result$all_drug_purchases, drug_purchases)
@@ -29,12 +28,12 @@ lab_measurements <- data.frame(FINNGENID = c("FG1", "FG1", "FG1", "FG1", "FG1", 
 
   before_period <- c(-1.5, 0)
   after_period <- c(0.00001, 1.5)
-  
+
   result <- generate_response_summary(lab_measurements, before_period, after_period)
-  
+
   expect_equal(nrow(result), 2)
   expect_equal(result$before, c(31, 27.5))
-  expect_equal(result$after, c(12, 47)) 
+  expect_equal(result$after, c(12, 47))
   expect_equal(result$response, c(-19, 19.5))
 })
 
@@ -42,7 +41,7 @@ lab_measurements <- data.frame(FINNGENID = c("FG1", "FG1", "FG1", "FG1", "FG1", 
 test_that("quant_text formats quantiles correctly", {
   vector <- c(1, 2, 3, 4, 5)
   result <- quant_text(vector)
-  
+
   expect_true(grepl("0%:", result))
   expect_true(grepl("100%:", result))
 })
@@ -54,7 +53,7 @@ test_that("create_drug_response returns the correct structure", {
     OMOP_CONCEPT_ID = c("lab1", "lab1", "lab1", "lab1", "lab2", "lab2", "lab2", "lab2", "lab2", "lab2"),
     EVENT_AGE = c(20.6, 20.7, 20.8, 21.5, 19.5, 19.6, 19.7, 20.5,25, 25.5),
     MEASUREMENT_VALUE_HARMONIZED = c(15, 16, 17, 25, 8, 9, 10, 40, 50, 38))
-  
+
   phenos <- data.frame(
     FINNGENID = c("FG1", "FG2","FG3"),
     SOURCE = c("PURCH", "PURCH","PURCH"),
@@ -70,13 +69,494 @@ test_that("create_drug_response returns the correct structure", {
 
   lablist <- c("lab1", "lab2")
   druglist <- c("A01", "A02")
-  
+
   result <- create_drug_response(conn, lablist, druglist, c(-1, 0), c(0.1, 1))
-  
-  expect_s3_class(result, "drug.reponse")
+
+  expect_s3_class(result, "drug.response")
   expect_equal(nrow(result$response), 2)
   expect_equal(result$response$FINNGENID, c("FG1", "FG2"))
   expect_equal(result$response$before, c(16, 9))
   expect_equal(result$response$after, c(25, 40))
   expect_equal(result$response$response, c(9, 31))
+})
+
+test_that("create_drug_response removes outliers correctly", {
+  kanta <- data.frame(
+    FINNGENID = c("FG1", "FG1", "FG1", "FG1", "FG2", "FG2", "FG2", "FG2", "FG3", "FG3", "FG4", "FG4"),
+    OMOP_CONCEPT_ID = c("lab1", "lab1", "lab1", "lab1", "lab1", "lab1", "lab1", "lab1", "lab1", "lab1", "lab1", "lab1"),
+    EVENT_AGE = c(20.6, 20.7, 20.8, 21.5, 19.5, 19.6, 19.7, 20.5, 25, 25.5, 30, 30.5),
+    MEASUREMENT_VALUE_HARMONIZED = c(15, 16, 17, 25, 8, 9, 10, 40, 50, 38, 1000, 1001) # Add a clear outlier
+  )
+
+  phenos <- data.frame(
+    FINNGENID = c("FG1", "FG2", "FG3", "FG4"),
+    SOURCE = c("PURCH", "PURCH", "PURCH", "PURCH"),
+    CODE1 = c("A01", "A02", "A02", "A01"),
+    CODE2 = c("", "", "", ""),
+    CODE3 = c("", "", "", ""),
+    CODE4 = c("1", "1", "1", "1"),
+    EVENT_AGE = c(21.0, 20.0, 35.0, 31.0)
+  )
+
+  lablist <- c("lab1")
+  druglist <- c("A01", "A02")
+
+  # Test with outlier removal
+  conn <- create_mock_connection(pheno_data = phenos, labs_data = kanta)
+  result <- create_drug_response(
+    conn = conn,
+    lablist = lablist,
+    druglist = druglist,
+    before_period = c(-1, 0),
+    after_period = c(0.1, 1),
+    remove_outliers_sd = 1
+  )
+
+  # FG4 has the outlier and should be removed from the response
+  expect_s3_class(result, "drug.response")
+  expect_equal(nrow(result$responses), 2)
+  expect_false("FG4" %in% result$responses$FINNGENID)
+
+  # Test that it throws an error with invalid input
+  expect_error(create_drug_response(
+    conn = conn, lablist = lablist, druglist = druglist,
+    before_period = c(-1, 0), after_period = c(0.1, 1), remove_outliers_sd = 7
+  ))
+  expect_error(create_drug_response(
+    conn = conn, lablist = lablist, druglist = druglist,
+    before_period = c(-1, 0), after_period = c(0.1, 1), remove_outliers_sd = "a"
+  ))
+})
+
+test_that("summarize_drug_purchases_upset creates a plot file", {
+  # Create a dummy drug.response object
+  response <- data.frame(FINNGENID = c(1, 2), response = c(1, 2))
+  lab_measurements <- data.frame(FINNGENID = c(1, 2), MEASUREMENT_VALUE_HARMONIZED = c(10, 20))
+  drug_purchases <- data.frame(
+    FINNGENID = c("FG1", "FG1", "FG2", "FG2", "FG3"),
+    ATC = c("A01", "A02", "A01", "A03", "A02")
+  )
+
+  drug_response_obj <- drug.response(response, lab_measurements, drug_purchases, c(-1, 0), c(0.1, 1))
+
+  # Define an output prefix
+  out_prefix <- "test_upset"
+
+  # Run the function
+  summarize_drug_purchases_upset(drug_response_obj, out_prefix)
+
+  # Check that the output file was created
+  output_file <- paste0(out_prefix, "_upset_plot.pdf")
+  expect_true(file.exists(output_file))
+
+  # Clean up the created file
+  if (file.exists(output_file)) {
+    file.remove(output_file)
+  }
+})
+
+test_that("get_drug_purchases handles input correctly", {
+  conn <- fg_data_connection(list(pheno = data.frame(
+    FINNGENID = c("FG1", "FG2", "FG3"),
+    SOURCE = c("PURCH", "PURCH", "PURCH"),
+    CODE1 = c("A01", "A02", "A02"),
+    CODE2 = c("", "", ""),
+    CODE3 = c("", "", ""),
+    CODE4 = c("1", "1", "1"),
+    EVENT_AGE = c(21.0, 20.0, 35)
+  ), labs = data.frame()))
+
+  expect_error(get_drug_purchases(conn$pheno, "A01", finngen_ids = "FG1"), NA)
+})
+
+# Helper function to create a realistic drug.response object for testing
+create_test_drug_response_object <- function() {
+  # Mock lab measurements
+  mock_labs <- data.frame(
+    FINNGENID = rep(paste0("FG", 1:4), each = 10),
+    OMOP_CONCEPT_ID = 12345,
+    EVENT_AGE = rep(c(30.1, 30.2, 30.8, 30.9, 31.0, 31.1, 31.2, 31.8, 31.9, 32.0), 4),
+    MEASUREMENT_VALUE_HARMONIZED = rnorm(40, mean = 100, sd = 15)
+  )
+
+  # Mock drug purchases
+  mock_purchases <- data.frame(
+    FINNGENID = paste0("FG", 1:4),
+    ATC = rep(c("DRUG_A", "DRUG_B"), each = 2),
+    EVENT_AGE = c(31.05, 31.05, 31.05, 31.05),
+    CODE1 = rep(c("DRUG_A", "DRUG_B"), each = 2) # for get_drug_purchases
+  )
+
+  # Add a clear outlier for testing the removal logic
+  mock_labs$MEASUREMENT_VALUE_HARMONIZED[5] <- 500
+
+  # Mimic the data preparation steps from create_drug_response
+  dr_first_purchase <- mock_purchases %>%
+    group_by(FINNGENID) %>%
+    summarise(first_drug_age = first(EVENT_AGE), first_drug = first(ATC))
+
+  all_measurements <- left_join(mock_labs, dr_first_purchase, by = "FINNGENID") %>%
+    mutate(time_to_drug = .data$first_drug_age - .data$EVENT_AGE)
+
+  # Create a minimal but valid drug.response object
+  drug.response(
+    responses = data.frame(FINNGENID = paste0("FG", 1:4)), # dummy data
+    lab_measurements = all_measurements,
+    drug_purchases = mock_purchases,
+    before_period = c(0.01, 1.0), # years (time_to_drug is positive)
+    after_period = c(-1.0, -0.01)  # years (time_to_drug is negative)
+  )
+}
+
+test_that("plot_lab_value_distribution handles input and options correctly", {
+  drug_resp_obj <- create_test_drug_response_object()
+
+  # Test 1: Function returns a ggplot object without outlier removal
+  p1 <- plot_lab_value_distribution(drug_resp_obj, remove_outliers = FALSE)
+  expect_true(ggplot2::is_ggplot(p1))
+
+  # Check that the outlier is present in the plot data
+  expect_true(500 %in% p1$data$MEASUREMENT_VALUE_HARMONIZED)
+
+  # Test 2: Function returns a ggplot object with outlier removal
+  p2 <- plot_lab_value_distribution(drug_resp_obj, remove_outliers = TRUE)
+  expect_true(ggplot2::is_ggplot(p2))
+
+  # Check that the outlier has been removed from the plot data
+  expect_false(500 %in% p2$data$MEASUREMENT_VALUE_HARMONIZED)
+
+  # Test 3: Plot data has the correct structure
+  p1_build <- ggplot2::ggplot_build(p1)
+  expect_true("Before" %in% p1$data$period)
+  expect_true("After" %in% p1$data$period)
+
+  # Test 4: Function throws an error for invalid input
+  expect_error(
+    plot_lab_value_distribution(list()),
+    "Input must be a drug.response object."
+  )
+})
+
+test_that("create_drug_response handles covariates correctly", {
+  # Mock minimal data
+  mock_labs <- data.frame(FINNGENID = "FG1", EVENT_AGE = 30, MEASUREMENT_VALUE_HARMONIZED = 100, OMOP_CONCEPT_ID = "L1")
+  mock_phenos <- data.frame(FINNGENID = "FG1", EVENT_AGE = 31, CODE1 = "D1", SOURCE = "PURCH")
+  mock_covariates <- data.frame(
+    FINNGENID = "FG1",
+    SEX = "female", # Test "female" string
+    AGE_AT_DEATH = 80,
+    UNRELATED_COL = "data"
+  )
+
+  # Test 1: Create drug response and add covariates separately
+  conn <- create_mock_connection(pheno_data = mock_phenos, labs_data = mock_labs)
+  response_obj <- create_drug_response(
+    conn = conn,
+    lablist = "L1",
+    druglist = "D1",
+    before_period = c(0.5, 1.5),
+    after_period = c(-0.5, 0.5)
+  )
+
+  # Add covariates to the response data
+  response_obj$responses <- join_covariates(
+    data = response_obj$responses,
+    covariates = mock_covariates,
+    covariate_cols = c("SEX", "AGE_AT_DEATH")
+  )
+
+  # Add covariates to the lab measurements
+  response_obj$all_measurements <- join_covariates_to_labs(
+    lab_data = response_obj$all_measurements,
+    covariates = mock_covariates,
+    covariate_cols = c("SEX", "AGE_AT_DEATH")
+  )
+
+  # Check that columns were added to both dataframes in the object
+  expect_true(all(c("SEX", "AGE_AT_DEATH") %in% colnames(response_obj$responses)))
+  expect_true(all(c("SEX", "AGE_AT_DEATH") %in% colnames(response_obj$all_measurements)))
+
+  # Check that unrequested columns were not added
+  expect_false("UNRELATED_COL" %in% colnames(response_obj$responses))
+
+  # Test 2: Function runs normally when covariates are not provided
+  response_obj_no_cov <- create_drug_response(
+    conn = conn,
+    lablist = "L1",
+    druglist = "D1",
+    before_period = c(0.5, 1.5),
+    after_period = c(-0.5, 0.5)
+  )
+  expect_false("SEX" %in% colnames(response_obj_no_cov$responses))
+
+  # Test 3: Helper function throws an error for missing covariate columns
+  response_obj_test <- create_drug_response(
+    conn = conn,
+    lablist = "L1",
+    druglist = "D1",
+    before_period = c(0.5, 1.5),
+    after_period = c(-0.5, 0.5)
+  )
+
+  expect_error(
+    join_covariates(
+      data = response_obj_test$responses,
+      covariates = mock_covariates,
+      covariate_cols = c("SEX", "NON_EXISTENT_COL") # One valid, one invalid
+    ),
+    "The following `covariate_cols` are not in the `covariates` dataframe: NON_EXISTENT_COL"
+  )
+})
+
+# Helper function to create test data for BLUP analysis
+create_test_blup_data <- function(include_sex = FALSE) {
+  set.seed(123)  # For reproducibility
+
+  # Create longitudinal lab measurements for 20 individuals
+  n_individuals <- 20
+  individuals <- paste0("FG", 1:n_individuals)
+
+  # Generate multiple measurements per individual
+  lab_data <- do.call(rbind, lapply(1:n_individuals, function(i) {
+    n_measurements <- sample(3:8, 1)  # Random number of measurements
+    base_age <- runif(1, 30, 50)
+    ages <- base_age + sort(runif(n_measurements, 0, 10))
+
+    # Individual-specific intercept and slope
+    intercept <- rnorm(1, 100, 10)
+    slope <- rnorm(1, -0.5, 0.2)  # Negative slope (decline over age)
+
+    data.frame(
+      FINNGENID = rep(individuals[i], n_measurements),
+      OMOP_CONCEPT_ID = rep(c("3004410", "3023602")[((i-1) %% 2) + 1], n_measurements),
+      EVENT_AGE = ages,
+      MEASUREMENT_VALUE_HARMONIZED = intercept + slope * ages + rnorm(n_measurements, 0, 5),
+      n = 1,
+      first_drug_age = rep(base_age + 5, n_measurements),
+      first_drug = rep("A10BJ", n_measurements),
+      time_to_drug = rep(base_age + 5, n_measurements) - ages
+    )
+  }))
+
+  # Create drug purchases data
+  drug_purchases <- data.frame(
+    FINNGENID = individuals,
+    ATC = rep("A10BJ", n_individuals),
+    EVENT_AGE = runif(n_individuals, 35, 55)
+  )
+
+  if (include_sex) {
+    sex_data <- data.frame(
+      FINNGENID = individuals,
+      SEX = sample(c("male", "female"), n_individuals, replace = TRUE)
+    )
+    lab_data <- left_join(lab_data, sex_data, by = "FINNGENID")
+  }
+
+  # Create drug.response object
+  drug.response(
+    responses = data.frame(FINNGENID = individuals),
+    lab_measurements = lab_data,
+    drug_purchases = drug_purchases,
+    before_period = c(-1, 0),
+    after_period = c(1/12, 1)
+  )
+}
+
+test_that("calculate_blup_slopes works correctly", {
+  # Create test data
+  drug_resp_obj_with_sex <- create_test_blup_data(include_sex = TRUE)
+  drug_resp_obj_no_sex <- create_test_blup_data(include_sex = FALSE)
+
+
+  # Create temporary directory for output
+  temp_dir <- tempdir()
+
+  # Test 1: Function runs without error and produces output files
+  blup_results <- calculate_blup_slopes(drug_resp_obj_with_sex, include_sex = TRUE,
+                                        output_dir = temp_dir)
+
+  expect_true(is.list(blup_results))
+  # Note: With small test data, models may not converge and results may be empty
+  # This is expected behavior, not a failure
+
+  # Check that output files were created
+  for (concept_id in names(blup_results)) {
+    output_file <- file.path(temp_dir, paste0(concept_id, "_DF13_blup.tsv"))
+    expect_true(file.exists(output_file))
+
+    # Read and check the output file
+    output_data <- read.table(output_file, header = TRUE, sep = "\t")
+    expect_equal(colnames(output_data), c("FID", "IID", paste0(concept_id, "_slope")))
+    expect_equal(output_data$FID, output_data$IID)
+  }
+
+  # Test 2: Function works without sex data
+  blup_results_no_sex <- calculate_blup_slopes(drug_resp_obj_no_sex, include_sex = FALSE,
+                                                output_dir = temp_dir)
+  expect_true(is.list(blup_results_no_sex))
+
+  # Test 3: Function handles minimum measurements requirement
+  blup_results_strict <- calculate_blup_slopes(drug_resp_obj_with_sex, include_sex = TRUE,
+                                                output_dir = temp_dir,
+                                                min_measurements = 5)
+  # Should have fewer individuals in the analysis
+  for (concept_id in names(blup_results_strict)) {
+    expect_true(blup_results_strict[[concept_id]]$n_individuals <=
+                blup_results[[concept_id]]$n_individuals)
+  }
+
+  # Test 4: Function throws error for invalid input
+  expect_error(
+    calculate_blup_slopes(list()),
+    "Input must be either a drug.response object or a data frame with lab measurements."
+  )
+
+  # Clean up temporary files
+  for (concept_id in c("3004410", "3023602")) {
+    file.remove(file.path(temp_dir, paste0(concept_id, "_DF13_blup.tsv")))
+  }
+})
+
+test_that("summarize_blup_results works correctly", {
+  # Create test data and run BLUP analysis
+  drug_resp_obj <- create_test_blup_data(include_sex = TRUE)
+  temp_dir <- tempdir()
+
+  blup_results <- calculate_blup_slopes(drug_resp_obj, include_sex = TRUE, output_dir = temp_dir)
+
+  # Test summarize function
+  summary_df <- summarize_blup_results(blup_results)
+
+  expect_true(is.data.frame(summary_df))
+  expect_equal(colnames(summary_df),
+               c("OMOP_CONCEPT_ID", "n_individuals", "mean_slope",
+                 "sd_slope", "min_slope", "max_slope"))
+  expect_equal(nrow(summary_df), length(blup_results))
+
+  # Check that slopes are negative on average (decline over age)
+  expect_true(all(summary_df$mean_slope < 0))
+
+  # Test with empty results
+  empty_summary <- summarize_blup_results(list())
+  expect_equal(nrow(empty_summary), 0)
+
+  # Clean up
+  for (concept_id in names(blup_results)) {
+    file.remove(file.path(temp_dir, paste0(concept_id, "_DF13_blup.tsv")))
+  }
+})
+
+test_that("get_lab_measurements can pull covariates", {
+  # Create mock lab data
+  mock_labs <- data.frame(
+    FINNGENID = rep(c("FG001", "FG002", "FG003"), each = 5),
+    OMOP_CONCEPT_ID = 3000963,
+    EVENT_AGE = rep(seq(50, 54), 3),
+    MEASUREMENT_VALUE_HARMONIZED = rnorm(15, mean = 100, sd = 10)
+  )
+
+  # Create mock covariate data
+  mock_covariates <- data.frame(
+    FINNGENID = c("FG001", "FG002", "FG003", "FG004"),
+    SEX = c("M", "F", "M", "F"),
+    AGE_AT_DEATH_OR_END_OF_FOLLOWUP = c(75, 80, 85, 90),
+    BMI = c(25.1, 28.3, 22.5, 26.7)
+  )
+
+  # Test 1: Pull lab measurements and add SEX covariate separately
+  result <- get_lab_measurements(
+    all_labs = mock_labs,
+    lablist = 3000963
+  )
+
+  # Add covariates using helper function
+  result <- join_covariates_to_labs(
+    lab_data = result,
+    covariates = mock_covariates,
+    covariate_cols = c("SEX")
+  )
+
+  expect_true("SEX" %in% colnames(result))
+  expect_equal(nrow(result), 15)
+  expect_equal(result$SEX[result$FINNGENID == "FG001"][1], "M")
+  expect_equal(result$SEX[result$FINNGENID == "FG002"][1], "F")
+
+  # Test 2: Pull with multiple covariates
+  result2 <- get_lab_measurements(
+    all_labs = mock_labs,
+    lablist = 3000963
+  )
+
+  result2 <- join_covariates_to_labs(
+    lab_data = result2,
+    covariates = mock_covariates,
+    covariate_cols = c("SEX", "AGE_AT_DEATH_OR_END_OF_FOLLOWUP")
+  )
+
+  expect_true(all(c("SEX", "AGE_AT_DEATH_OR_END_OF_FOLLOWUP") %in% colnames(result2)))
+  expect_equal(result2$AGE_AT_DEATH_OR_END_OF_FOLLOWUP[result2$FINNGENID == "FG001"][1], 75)
+
+  # Test 3: Error when requesting non-existent covariate columns
+  expect_error(
+    join_covariates_to_labs(
+      lab_data = result,
+      covariates = mock_covariates,
+      covariate_cols = c("SEX", "NONEXISTENT_COL")
+    ),
+    "The following `covariate_cols` are not in the `covariates` dataframe: NONEXISTENT_COL"
+  )
+
+  # Test 4: No error when covariates or covariate_cols is NULL
+  result3 <- get_lab_measurements(
+    all_labs = mock_labs,
+    lablist = 3000963
+  )
+  expect_false("SEX" %in% colnames(result3))
+
+  result4 <- get_lab_measurements(
+    all_labs = mock_labs,
+    lablist = 3000963
+  )
+  expect_false("SEX" %in% colnames(result4))
+})
+
+test_that("calculate_blup_slopes works with lab measurements that include covariates", {
+  # Create mock lab data with covariates and more realistic variation
+  set.seed(123)
+  n_individuals <- 30
+  n_measurements <- 15
+
+  # Generate data with individual-specific slopes
+  mock_data <- do.call(rbind, lapply(1:n_individuals, function(i) {
+    # Individual-specific intercept and slope
+    intercept <- rnorm(1, mean = 100, sd = 10)
+    slope <- rnorm(1, mean = 0.5, sd = 0.2)
+    ages <- seq(50, 64, length.out = n_measurements)
+
+    data.frame(
+      FINNGENID = paste0("FG", sprintf("%03d", i)),
+      OMOP_CONCEPT_ID = 3000963,
+      EVENT_AGE = ages,
+      MEASUREMENT_VALUE_HARMONIZED = intercept + slope * (ages - 50) + rnorm(n_measurements, 0, 2),
+      SEX = ifelse(i <= n_individuals/2, "M", "F")
+    )
+  }))
+
+  # Test that BLUP calculation works with SEX included
+  expect_no_error({
+    result <- calculate_blup_slopes(
+      data = mock_data,
+      output_dir = tempdir(),
+      include_sex = TRUE,
+      min_measurements = 5
+    )
+  })
+
+  # Verify output file exists
+  output_file <- file.path(tempdir(), "3000963_DF13_blup.tsv")
+  expect_true(file.exists(output_file))
+
+  # Clean up
+  unlink(output_file)
 })

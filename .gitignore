@@ -1,5 +1,37 @@
+# R package build artifacts
 .Rproj.user
 .Rhistory
 .Rdata
+.Ruserdata
 .httr-oauth
 .DS_Store
+
+# R CMD check results
+.Rcheck/
+*.Rcheck/
+
+# Log files
+*.log
+*.out
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Cache files
+*.cache
+.cache/
+
+# Local configuration files (keep separate from committed version)
+config/db_config.json
+config/db_config_local.json
+
+# Output directories that might be created during testing
+output/
+results/
+blup_output*/
+variance_output*/
+
+# R package documentation
+man/*.Rd.bak
