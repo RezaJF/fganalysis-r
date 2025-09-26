@@ -7,7 +7,7 @@
 smooth_measurement_intervals(df, min_interval_months = 6)
 }
 \arguments{
-\item{df}{A data frame for a single individual, containing EVENT_AGE and MEASUREMENT_VALUE_HARMONIZED.
+\item{df}{A data frame for a single individual, containing EVENT_AGE and VALUE.
 Any additional columns will be preserved by taking the first value in each cluster.}
 
 \item{min_interval_months}{The minimum interval in months. Measurements closer than this will be clustered. Defaults to 6.}

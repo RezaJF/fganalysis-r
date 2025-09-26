@@ -10,6 +10,10 @@ create_drug_response(
   druglist,
   before_period,
   after_period,
+  summary_function = median,
+  filter_min_max = c(-Inf, Inf),
+  use_lab_free_text_values = TRUE,
+  use_only_reimbursement_drugs = FALSE,
   finngen_ids = NULL,
   remove_outliers_sd = NULL
 )
@@ -24,6 +28,14 @@ create_drug_response(
 \item{before_period}{A numeric vector of length 2 defining the before period (e.g., c(-1, 0) for 1 year to 0 before drug)}
 
 \item{after_period}{A numeric vector of length 2 defining the after period (e.g., c(0.1, 1) for 0.1 to 1 year after drug)}
+
+\item{summary_function}{A function to summarize the lab measurements (default is median)}
+
+\item{filter_min_max}{A numeric vector of length 2 defining min and max lab values to include (default: c(-Inf, Inf))}
+
+\item{use_lab_free_text_values}{Logical, if False, Dont include lab measurements from free text value column (default: TRUE)}
+
+\item{use_only_reimbursement_drugs}{Logical, if TRUE, use only reimbursement data (default FALSE) and do not include delivery data from KANTA}
 
 \item{finngen_ids}{Optional character vector of FINNGENIDs to restrict analysis}
 

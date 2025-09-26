@@ -15,6 +15,7 @@ quant_text <- function(vector) {
   paste0( paste(names(quantile(vector)), sep="\t"), ":", paste(quantile(vector),sep="\t"), collapse=" ")
 }
 
+
 #' @title Summarize drug response
 #' @description Summarize drug response data created with create_drug_response. writes plots and tables to disk
 #' @param drug_response drug.response object
@@ -22,104 +23,149 @@ quant_text <- function(vector) {
 #' @return NULL
 #' @export
 summarize_drug_response <- function(drug_response, out_file_prefix) {
+    labs <- drug_response$all_measurements %>% filter(!is.na(.data$VALUE))
+    responses <- drug_response$responses %>% filter(!is.na(.data$response))
+    drugs <- drug_response$all_drug_purchases
 
-  # Helper function to calculate p-value from a one-sample t-test (via lm)
-  # This is a robust way to test if the mean of 'x' is different from zero.
-  get_response_p_value <- function(x) {
-    # Using lm is robust for cases with low variance or few samples
-    summary(lm(x ~ 1))$coefficients[1, 4]
-  }
+    pdf(paste0(out_file_prefix, ".pdf"), width = 10, height = 6)
 
-  labs <- drug_response$all_measurements %>% filter(!is.na(.data$MEASUREMENT_VALUE_HARMONIZED))
-  responses <- drug_response$responses
-  drugs <- drug_response$all_drug_purchases
+    inds_with_lab <- length(unique(labs$FINNGENID))
+    n_lab_meas <- nrow(labs)
 
-  pdf(paste0(out_file_prefix, ".pdf"), width=10, height=6)
+    inds_with_drugs <- length(unique(drugs$FINNGENID))
+    n_drugs_meas <- nrow(drugs)
 
-  inds_with_lab <- length(unique(labs$FINNGENID))
-  n_lab_meas <- nrow(labs)
+    inds_in_analysis <- nrow(responses )
 
-  inds_with_drugs <- length(unique(drugs$FINNGENID))
-  n_drugs_meas <- nrow(drugs)
+    n_range_before <- quant_text(responses$n_before)
+    n_range_after <- quant_text(responses$n_before)
 
-  inds_in_analysis <- nrow(responses)
-  n_range_before <- quant_text(responses$n_before)
-  n_range_after <- quant_text(responses$n_before)
+    range_baseline_age <- quant_text(responses$n_before)
 
-  range_baseline_age <- quant_text(responses$n_before)
+    n_no_pre <- drug_response$responses %>% filter(is.na(response) & n_before == 0)
+    n_no_pos <- drug_response$responses %>% filter(is.na(response) & n_after == 0)
 
-  plot(ggtexttable(data.frame("Group"=c("labs","drugs","in analysis"),
-                         "N"= c(inds_with_lab, inds_with_drugs, inds_in_analysis),
-                         "N events" = c(n_lab_meas, n_drugs_meas, inds_in_analysis)), rows=NULL))
+    plot(ggtexttable(data.frame(
+        "Group" = c("labs", "drugs", "in analysis", "no_pre_value", "no_post_value"),
+        "N" = c(inds_with_lab, inds_with_drugs, inds_in_analysis, nrow(n_no_pre), nrow(n_no_pos)),
+        "N events" = c(n_lab_meas, n_drugs_meas, inds_in_analysis, sum(n_no_pre$n_after), sum(n_no_pos$n_before))
+    ), rows = NULL))
 
 
-  per_drug <- responses %>%
-    group_by(.data$first_drug) %>%
-    summarise(
-      N = n(),
-      p = get_response_p_value(.data$response),
-      sd = sd(.data$response),
-      mean_response = mean(.data$response),
-      purch_age_dist = quant_text(.data$baseline_age)
+    per_drug <- responses %>%
+        group_by(.data$first_drug) %>%
+        summarise(
+            N = n(), p = summary(lm("response ~ 1", data = pick(.data$FINNGENID, .data$response)))$coefficients[1, 4], sd = sd(.data$response),
+            response = mean(.data$response),
+            purch_age_dist = quant_text(.data$baseline_age)
+        )
+
+    all_resp <- rbind(per_drug, data.frame(
+        first_drug = "All drugs", N = inds_in_analysis,
+        response = mean(responses$response), p = summary(lm("response ~ 1", data = responses))$coefficients[1, 4],
+        purch_age_dist = quant_text(responses$baseline_age), sd = sd(responses$response)
+    ))
+
+    write.table(
+        all_resp %>% arrange(desc(.data$N)) %>%
+            select(.data$first_drug, .data$N, .data$response, .data$p, .data$purch_age_dist),
+        paste0(out_file_prefix, "_responses_by_drug.txt"),
+        sep = "\t", row.names = FALSE, quote = FALSE
     )
 
-  all_resp <- rbind(per_drug %>% rename(response = .data$mean_response),
-                    data.frame(first_drug = "All drugs",
-                               N = inds_in_analysis,
-                               response = mean(responses$response),
-                               p = get_response_p_value(responses$response),
-                               purch_age_dist = quant_text(responses$baseline_age),
-                               sd = sd(responses$response)))
 
-  write.table(all_resp %>% arrange(desc(.data$N)) %>%
-    select(.data$first_drug, .data$N, .data$response, .data$p, .data$purch_age_dist),
-    paste0(out_file_prefix, "_responses_by_drug.txt"), sep="\t", row.names=FALSE, quote=FALSE)
-
-
-  plot(ggtexttable(responses %>% group_by(.data$first_drug) %>%
-    summarise(n_purch=n(), n_indiv=length(unique(.data$FINNGENID)),
-     p=get_response_p_value(.data$response),
-     response=mean(.data$response),
-     purch_age_dist=quant_text(.data$baseline_age)) %>%
-     select(.data$first_drug, .data$n_purch, .data$response, .data$p, .data$purch_age_dist) %>%
-    arrange(desc(.data$n_purch))))
+    plot(ggtexttable(responses %>% group_by(.data$first_drug) %>%
+        summarise(
+            n_purch = n(), n_indiv = length(unique(.data$FINNGENID)),
+            p = summary(lm("response ~ 1", data = pick(.data$FINNGENID, .data$response)))$coefficients[1, 4],
+            response = mean(.data$response),
+            purch_age_dist = quant_text(.data$baseline_age)
+        ) %>%
+        select(.data$first_drug, .data$n_purch, .data$response, .data$p, .data$purch_age_dist) %>%
+        arrange(desc(.data$n_purch))))
 
 
-  begin <- ceiling(max(min(-labs$time_to_drug, na.rm = TRUE), drug_response$lab_response_period$before_period[1]))
-  end <- ceiling(min(max(-labs$time_to_drug, na.rm = TRUE), drug_response$lab_response_period$after_period[2]))
-  labs$bin <- cut(-labs$time_to_drug,
-                  breaks=seq(begin, end, by=.25),
-                  include.lowest = TRUE)
+    begin <- ceiling(max(min(-labs$time_to_drug, na.rm = TRUE), drug_response$lab_response_period$before_period[1]))
+    end <- ceiling(min(max(-labs$time_to_drug, na.rm = TRUE), drug_response$lab_response_period$after_period[2]))
+    labs$bin <- cut(-labs$time_to_drug,
+        breaks = seq(begin, end, by = .25),
+        include.lowest = TRUE
+    )
 
-  plot(ggplot(labs %>% filter(!is.na(.data$bin))) + geom_boxplot(aes(x=.data$bin, y=.data$MEASUREMENT_VALUE_HARMONIZED)) +
-      labs(x="Time to drug purchase (years)", y="Lab measurement") +
-      ggtitle("Lab measurements before and after drug purchase")) +  theme_bw() +
-      theme(axis.text.x = element_text(angle = 45, size=20)) +
-
-
-  write.table(labs %>% group_by(.data$bin) %>%
-    summarise(n=n(), mean=mean(.data$MEASUREMENT_VALUE_HARMONIZED), sd=sd(.data$MEASUREMENT_VALUE_HARMONIZED)),
-    paste0(out_file_prefix, "_labs_by_time_to_drug.txt"), sep="\t", row.names=FALSE, quote=FALSE)
+    plot(ggplot(labs %>% filter(!is.na(.data$bin))) +
+        geom_boxplot(aes(x = .data$bin, y = .data$VALUE)) +
+        labs(x = "Time to drug purchase (years)", y = "Lab measurement") +
+        ggtitle("Lab measurements before and after drug purchase")) + theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, size = 20)) 
 
 
-  plot(ggplot(responses) + geom_histogram(aes(x=.data$response)) + theme_bw() +
-      labs(x="Response (after - before)", y="Count") +
-      ggtitle("Distribution of drug response"))
+    uniq_drugs <- unique(responses$first_drug)
 
-  fit <- summary(lm(after ~ before, data=responses))
+    for( drug in uniq_drugs){
+        labs_sub <- labs %>% filter(!is.na(.data$bin))  
+        p <- ggplot(labs_sub)  + geom_boxplot(aes(x = .data$bin, y = .data$VALUE)) +
+        labs(x = "Time to drug purchase (years)", y = "Lab measurement") +
+        ggtitle(paste("Lab measurements before and after drug purchase for drug ", drug)) + theme_bw() +
+        theme(axis.text.x = element_text(size = 10))
+        plot(p)
+    }
 
-  slope <- format(fit$coefficients["before","Estimate"], digits=2)
-  r2 <- format(fit$r.squared, digits=2)
-  p <- format(fit$coefficients["before","Pr(>|t|)"], digits=2, scientific=TRUE)
+    write.table(
+        labs %>% group_by(.data$bin) %>%
+            summarise(n = n(), mean = mean(.data$VALUE), sd = sd(.data$VALUE)),
+        paste0(out_file_prefix, "_labs_by_time_to_drug.txt"),
+        sep = "\t", row.names = FALSE, quote = FALSE
+    )
 
-  suppressWarnings(print(ggplot(responses, aes(x=.data$before, y=.data$after)) + geom_point() + geom_smooth(method="lm") +
-      geom_abline(slope=1) +
-      ggtitle(paste0("Before vs. after values. Slope: ", slope, " R2: ", r2, " p: ", p))))
 
-  dev.off()
+    plot(ggplot(responses) +
+        geom_histogram(aes(x = .data$response)) +
+        theme_bw() +
+        labs(x = "Response (after - before)", y = "Count") +
+        ggtitle("Distribution of drug response"))
 
-  print(paste0("Created summary plots and tables with prefix: ", out_file_prefix))
+    
+    plot(ggplot(responses) +
+        geom_histogram(aes(x = .data$response_percent)) +
+        theme_bw() +
+        labs(x = "Response%", y = "Count") +
+        ggtitle("Distribution of % drug response"))
+    
+    for( drug in uniq_drugs){
+        labs_sub <- responses %>% filter( .data$first_drug == drug)
+        p <- ggplot(labs_sub) +
+        geom_histogram(aes(x = .data$response)) +
+        theme_bw() +
+        labs(x = "Response (after - before)", y = "Count") +
+        ggtitle( paste0("Distribution of drug response for drug ", drug))   
+        plot(p)
 
+        p <- ggplot(labs_sub) +
+        geom_histogram(aes(x = .data$response_percent)) +
+        theme_bw() +
+        labs(x = "Response%", y = "Count") +
+        ggtitle(paste0("Distribution of % drug response for drug ", drug))
+        plot(p)
+
+    }
+
+
+
+    fit <- summary(lm(after ~ before, data = responses))
+
+    slope <- format(fit$coefficients["before", "Estimate"], digits = 2)
+    r2 <- format(fit$r.squared, digits = 2)
+    p <- format(fit$coefficients["before", "Pr(>|t|)"], digits = 2, scientific = TRUE)
+
+    suppressWarnings(print(ggplot(responses, aes(x = .data$before, y = .data$after)) +
+        geom_point() +
+        geom_smooth(method = "lm") +
+        geom_abline(slope = 1) +
+        ggtitle(paste0("Before vs. after values. Slope: ", slope, " R2: ", r2, " p: ", p))))
+
+    dev.off()
+
+    print(paste0("Created summary plots and tables with prefix: ", out_file_prefix))
 }
 
 

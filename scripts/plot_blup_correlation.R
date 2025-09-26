@@ -9,7 +9,7 @@ if (!exists("lab_measurements")) {
   message("Creating a placeholder 'lab_measurements' data frame.")
   lab_measurements <- data.frame(
     FINNGENID = rep(paste0("FG", 1:100), each = 5),
-    MEASUREMENT_VALUE_HARMONIZED = rnorm(500, mean = 100, sd = 15),
+    VALUE = rnorm(500, mean = 100, sd = 15),
     stringsAsFactors = FALSE
   )
 }
@@ -20,7 +20,7 @@ lab_summary <- lab_measurements %>%
   group_by(FINNGENID) %>%
   summarise(
     n_measurements = n(),
-    median_value = median(MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE)
+    median_value = median(VALUE, na.rm = TRUE)
   ) %>%
   filter(n_measurements > 2)
 

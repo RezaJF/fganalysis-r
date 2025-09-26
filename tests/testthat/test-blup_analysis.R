@@ -23,7 +23,7 @@ test_that("calculate_blup_slopes works with save_model and plot_blup_correlation
       FINNGENID = finngenid,
       OMOP_CONCEPT_ID = "3001308",
       EVENT_AGE = ages,
-      MEASUREMENT_VALUE_HARMONIZED = lab_values,
+      VALUE = lab_values,
       SEX = sample(c("male", "female"), 1)
     )
     lab_data <- rbind(lab_data, individual_data)
@@ -116,7 +116,7 @@ test_that("calculate_blup_slopes correlation calculation works with calculate_qc
       FINNGENID = finngenid,
       OMOP_CONCEPT_ID = "3001308",
       EVENT_AGE = ages,
-      MEASUREMENT_VALUE_HARMONIZED = lab_values,
+      VALUE = lab_values,
       SEX = sample(c("male", "female"), 1)
     )
     lab_data <- rbind(lab_data, individual_data)
@@ -159,7 +159,7 @@ test_that("calculate_blup_slopes handles insufficient data for correlation", {
         FINNGENID = c("FG1", "FG2"),
         OMOP_CONCEPT_ID = "3001308",
         EVENT_AGE = c(20, 21),
-        MEASUREMENT_VALUE_HARMONIZED = c(1, 2)
+        VALUE = c(1, 2)
       ),
       plot_blup_correlation = TRUE,
       include_sex = FALSE
@@ -196,7 +196,7 @@ test_that("calculate_blup_slopes recovers known individual slopes with synthetic
       FINNGENID = finngenid,
       OMOP_CONCEPT_ID = "3001308",
       EVENT_AGE = ages,
-      MEASUREMENT_VALUE_HARMONIZED = lab_values,
+      VALUE = lab_values,
       SEX = "male"  # Keep simple for testing
     )
     lab_data <- rbind(lab_data, individual_data)
@@ -263,7 +263,7 @@ test_that("calculate_blup_slopes handles edge cases correctly", {
       FINNGENID = finngenid,
       OMOP_CONCEPT_ID = "3001308",
       EVENT_AGE = ages,
-      MEASUREMENT_VALUE_HARMONIZED = lab_values,
+      VALUE = lab_values,
       SEX = "male"
     )
     lab_data_no_variation <- rbind(lab_data_no_variation, individual_data)
@@ -302,7 +302,7 @@ test_that("calculate_blup_slopes handles edge cases correctly", {
       FINNGENID = finngenid,
       OMOP_CONCEPT_ID = "3001308",
       EVENT_AGE = ages,
-      MEASUREMENT_VALUE_HARMONIZED = lab_values,
+      VALUE = lab_values,
       SEX = "male"
     )
     lab_data_perfect <- rbind(lab_data_perfect, individual_data)
@@ -335,7 +335,7 @@ test_that("calculate_blup_slopes handles edge cases correctly", {
       FINNGENID = finngenid,
       OMOP_CONCEPT_ID = "3001308",
       EVENT_AGE = ages,
-      MEASUREMENT_VALUE_HARMONIZED = lab_values,
+      VALUE = lab_values,
       SEX = "male"
     )
     lab_data_extreme <- rbind(lab_data_extreme, individual_data)
@@ -379,7 +379,7 @@ test_that("BLUP slopes have expected statistical properties", {
       FINNGENID = finngenid,
       OMOP_CONCEPT_ID = "3001308",
       EVENT_AGE = ages,
-      MEASUREMENT_VALUE_HARMONIZED = lab_values,
+      VALUE = lab_values,
       SEX = sample(c("male", "female"), 1)
     )
     lab_data <- rbind(lab_data, individual_data)

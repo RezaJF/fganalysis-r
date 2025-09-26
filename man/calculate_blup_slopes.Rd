@@ -22,7 +22,7 @@ calculate_blup_slopes(
 }
 \arguments{
 \item{data}{Either a `drug.response` object or a data frame with lab measurements.
-If a data frame, it must contain columns: FINNGENID, OMOP_CONCEPT_ID, EVENT_AGE, and MEASUREMENT_VALUE_HARMONIZED}
+If a data frame, it must contain columns: FINNGENID, OMOP_CONCEPT_ID, EVENT_AGE, and VALUE}
 
 \item{output_dir}{Directory where output files will be saved. Defaults to current directory}
 

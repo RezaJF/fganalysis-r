@@ -236,8 +236,8 @@ This package provides a suite of functions for drug response analysis.
 - **`create_mock_connection(pheno_data, labs_data, ...)`**: Creates a mock connection object using data frames instead of database connections. Useful for testing, development, and working with small datasets that can fit in memory.
 
 ### Data Retrieval
-- **`get_lab_measurements(all_labs, lablist, require_values = TRUE, return_cols = c("FINNGENID","OMOP_CONCEPT_ID", "EVENT_AGE", "MEASUREMENT_VALUE_HARMONIZED"), finngen_ids = NULL, lazy = FALSE)`**: Extracts lab measurements for specified OMOP concept IDs.
-  - `require_values`: If TRUE, only returns rows with non-missing MEASUREMENT_VALUE_HARMONIZED
+- **`get_lab_measurements(all_labs, lablist, require_values = TRUE, return_cols = c("FINNGENID","OMOP_CONCEPT_ID", "EVENT_AGE", "VALUE"), finngen_ids = NULL, lazy = FALSE)`**: Extracts lab measurements for specified OMOP concept IDs.
+  - `require_values`: If TRUE, only returns rows with non-missing VALUE
   - `return_cols`: Columns to return from the lab data
   - `finngen_ids`: Optional vector of FINNGENIDs to filter the data
   - `lazy`: If TRUE, returns a lazy tbl object instead of collecting data
@@ -297,7 +297,7 @@ To avoid file conflicts when running both BLUP and median analyses:
 
 ### BLUP Analysis (Linear Mixed Models)
 - **`calculate_blup_slopes(data, output_dir = ".", min_measurements = 2, include_sex = TRUE, debug_dir = NULL, drug_exposed_only = FALSE, calculate_post_variance = FALSE, calculate_qc = FALSE, normalize_variance = FALSE, save_model = FALSE, plot_blup_correlation = FALSE, output_file_prefix = NULL, smooth_measurement_intervals = NULL)`**: Implements a linear mixed model (LMM) to calculate Best Linear Unbiased Predictors (BLUPs) for individual-specific slopes of lab value changes over age. This follows the methodology from [Wiegrebe et al. (2024) Nature Communications](https://www.nature.com/articles/s41467-024-54483-9). The function:
-  - **NEW**: Accepts either a `drug.response` object OR a data frame with lab measurements (must contain: FINNGENID, OMOP_CONCEPT_ID, EVENT_AGE, MEASUREMENT_VALUE_HARMONIZED)
+  - **NEW**: Accepts either a `drug.response` object OR a data frame with lab measurements (must contain: FINNGENID, OMOP_CONCEPT_ID, EVENT_AGE, VALUE)
   - Fits a model: `lab_value ~ sex + age + (age | FINNGENID)` with random intercepts and slopes
   - Sex is coded according to the PLINK/REGENIE standard (1=Male, 2=Female, 0=Missing/Unknown)
   - If `include_sex = TRUE` (default), the function expects a SEX column in the drug_response object. If not found, it will raise an error with instructions to use `create_drug_response()` with appropriate covariates
@@ -637,8 +637,8 @@ measurements_before_mad <- get_measurements_before_drug(
 
 # Apply MAD outlier removal
 measurements_after_mad <- measurements_before_mad %>%
-  filter(MEASUREMENT_VALUE_HARMONIZED %in%
-         filter_outliers_mad(MEASUREMENT_VALUE_HARMONIZED, th = 5))
+  filter(VALUE %in%
+         filter_outliers_mad(VALUE, th = 5))
 
 # Calculate median values (data processing only)
 median_results <- get_median_pre_drug(

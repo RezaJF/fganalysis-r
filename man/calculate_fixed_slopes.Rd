@@ -7,7 +7,7 @@
 calculate_fixed_slopes(data, min_measurements = 2)
 }
 \arguments{
-\item{data}{Data frame with columns: FINNGENID, EVENT_AGE, MEASUREMENT_VALUE_HARMONIZED}
+\item{data}{Data frame with columns: FINNGENID, EVENT_AGE, VALUE}
 
 \item{min_measurements}{Minimum number of measurements per individual (default: 2)}
 }

@@ -16,7 +16,7 @@ utils::globalVariables(c(".", "fixed_slope"))
 #' for individual-specific slopes of lab value changes over age, following the methodology from
 #' Wiegrebe et al. (2024) Nature Communications.
 #' @param data Either a `drug.response` object or a data frame with lab measurements.
-#' If a data frame, it must contain columns: FINNGENID, OMOP_CONCEPT_ID, EVENT_AGE, and MEASUREMENT_VALUE_HARMONIZED
+#' If a data frame, it must contain columns: FINNGENID, OMOP_CONCEPT_ID, EVENT_AGE, and VALUE
 #' @param output_dir Directory where output files will be saved. Defaults to current directory
 #' @param min_measurements Minimum number of measurements per individual to include in analysis (default: 2)
 #' @param include_sex Logical indicating whether to include sex as a fixed effect in the model (default: TRUE).
@@ -71,7 +71,7 @@ calculate_blup_slopes <- function(data, output_dir = ".",
 
   # Validate data frame input
   if (!is_drug_response) {
-    required_cols <- c("FINNGENID", "OMOP_CONCEPT_ID", "EVENT_AGE", "MEASUREMENT_VALUE_HARMONIZED")
+    required_cols <- c("FINNGENID", "OMOP_CONCEPT_ID", "EVENT_AGE", "VALUE")
     missing_cols <- setdiff(required_cols, colnames(data))
     if (length(missing_cols) > 0) {
       stop("Lab measurement data frame is missing required columns: ", paste(missing_cols, collapse = ", "))
@@ -91,7 +91,7 @@ calculate_blup_slopes <- function(data, output_dir = ".",
   # Extract lab measurements based on input type
   if (is_drug_response) {
     lab_data <- data$all_measurements %>%
-      filter(!is.na(.data$MEASUREMENT_VALUE_HARMONIZED))
+      filter(!is.na(.data$VALUE))
 
     # Extract period definitions for variance calculation
     after_period <- data$lab_response_period$after_period
@@ -101,7 +101,7 @@ calculate_blup_slopes <- function(data, output_dir = ".",
   } else {
     # Direct lab measurement input
     lab_data <- data %>%
-      filter(!is.na(.data$MEASUREMENT_VALUE_HARMONIZED))
+      filter(!is.na(.data$VALUE))
 
     # No period definitions available for direct lab input
     after_period <- NULL
@@ -203,13 +203,13 @@ calculate_blup_slopes <- function(data, output_dir = ".",
     analysis_data$EVENT_AGE_SCALED <- (analysis_data$EVENT_AGE - age_mean) / age_sd
 
     # Scale lab values by their SD
-    lab_mean <- mean(analysis_data$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE)
-    lab_sd <- sd(analysis_data$MEASUREMENT_VALUE_HARMONIZED, na.rm = TRUE)
+    lab_mean <- mean(analysis_data$VALUE, na.rm = TRUE)
+    lab_sd <- sd(analysis_data$VALUE, na.rm = TRUE)
     if (lab_sd == 0) {
       warning(paste0("No variation in lab values for OMOP_CONCEPT_ID ", concept_id, ". Skipping analysis."))
       next
     }
-    analysis_data$LAB_VALUE_SCALED <- (analysis_data$MEASUREMENT_VALUE_HARMONIZED - lab_mean) / lab_sd
+    analysis_data$LAB_VALUE_SCALED <- (analysis_data$VALUE - lab_mean) / lab_sd
 
     # Fit the linear mixed model
     # Model: lab_value ~ sex + age + (age | FINNGENID)
@@ -361,9 +361,9 @@ calculate_blup_slopes <- function(data, output_dir = ".",
             df <- .
             tryCatch({
               if (include_sex && nrow(df) >= 3) {
-                lm_fit <- lm(MEASUREMENT_VALUE_HARMONIZED ~ EVENT_AGE + SEX_CODED, data = df)
+                lm_fit <- lm(VALUE ~ EVENT_AGE + SEX_CODED, data = df)
               } else if (nrow(df) >= 3) {
-                lm_fit <- lm(MEASUREMENT_VALUE_HARMONIZED ~ EVENT_AGE, data = df)
+                lm_fit <- lm(VALUE ~ EVENT_AGE, data = df)
               } else {
                 return(data.frame(fixed_slope = NA_real_))
               }

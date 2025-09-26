@@ -8,8 +8,7 @@ get_lab_measurements(
   all_labs,
   lablist,
   require_values = TRUE,
-  return_cols = c("FINNGENID", "OMOP_CONCEPT_ID", "EVENT_AGE",
-    "MEASUREMENT_VALUE_HARMONIZED"),
+  use_freetext_values = TRUE,
   finngen_ids = NULL,
   lazy = FALSE
 )
@@ -19,9 +18,9 @@ get_lab_measurements(
 
 \item{lablist}{vector of lab measurement concept IDs}
 
-\item{require_values}{logical, if TRUE, only return rows with non-missing MEASUREMENT_VALUE_HARMONIZED}
+\item{require_values}{logical, if TRUE, only return rows with non-missing VALUE}
 
-\item{return_cols}{vector of column names to return}
+\item{use_freetext_values}{logical, if TRUE, use lab measurement also from result free text column}
 
 \item{finngen_ids}{vector of FINNGENIDs to filter the data}
 
