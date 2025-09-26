@@ -54,11 +54,10 @@ get_lab_measurements <- function(all_labs, lablist, require_values=TRUE,
 
 
 #' @title Get drug purchases from FinnGen data
-#' @param all_phenos finngen data connection object
+#' @param conn finngen data connection object
 #' @param druglist vector of drug ATC codes. The ATC codes are matched with the first part of the code (e.g. A01*)
 #' @param finngen_ids vector of FINNGENIDs to filter the data. leave empty to get all
 #' @param use_only_reimbursement logical, if TRUE, use only reimbursement data (default FALSE) and combine reimbursement and delivery data if available in conn
-#' @param return_cols vector of column names to return
 #' @param lazy logical, if TRUE, return a lazy tbl object
 #' @return data frame with drug purchases
 #' @export
