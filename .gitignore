@@ -4,3 +4,8 @@
 .httr-oauth
 .DS_Store
 config/db_config.json
+config/db_config_local.json
+..Rcheck/
+.Rcheck/
+*.Rcheck/
+tests/testthat/*.tsv
