@@ -24,7 +24,10 @@ test_that("generate_response_summary calculates correct summaries", {
         EVENT_AGE = c(21.1, 20, 20.5, 21.5, 22.0, 34, 34.4, 33.5, 35.0, 40, 40.5),
         VALUE = c(10, 20, 42, 15, 12, 30, 44, 25, 50, 120, 38),
         first_drug = c("A01", "A01", "A01", "A01", "A01", "A02", "A02", "A02", "A02", "A03", "A03"),
-        first_drug_age = c(21.05, 21.05, 21.05, 21.05, 21.05, 34.2, 34.2, 34.2, 34.2, 35, 35)
+        first_drug_age = c(21.05, 21.05, 21.05, 21.05, 21.05, 34.2, 34.2, 34.2, 34.2, 35, 35),
+        first_drug_date = as.Date(c("2015-07-17" , "2015-07-17", "2015-07-17", "2015-07-17", "2015-07-17",
+                                         "2015-07-18", "2015-07-18", "2015-07-18", "2015-07-18",
+                                         "2015-07-19", "2015-07-19"))
     )
     lab_measurements <- lab_measurements %>% mutate(time_to_drug = first_drug_age - EVENT_AGE)
 
