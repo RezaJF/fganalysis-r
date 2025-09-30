@@ -108,7 +108,7 @@ create_drug_response <- function(conn, lablist, druglist,
         group_by(.data$FINNGENID) %>%
         arrange(.data$EVENT_AGE) %>%
         dplyr::summarize(n = n(), first_drug_age = first(.data$EVENT_AGE), 
-        first_drug = first(.data$ATC))
+        first_drug = first(.data$ATC), first_drug_date = first(.data$APPROX_EVENT_DAY))
     print(paste0("Number of drug purchases: ", nrow(drug_purchases)))
     lab_measurements <- dplyr::left_join(lab_measurements, dr_first_purchase, by = "FINNGENID")
     lab_measurements <- lab_measurements %>% mutate(time_to_drug = .data$first_drug_age - .data$EVENT_AGE)
@@ -159,6 +159,7 @@ generate_response_summary <- function(lab_measurements, before_period, after_per
             before = ifelse(n_before>0,summary_function(.data$VALUE[.data$lab_period == "Before"], na.rm = TRUE),NA),
             after = ifelse(n_after>0,summary_function(.data$VALUE[.data$lab_period == "After"], na.rm = TRUE),NA),
             baseline_age = first(.data$first_drug_age),
+            baseline_date = first(.data$first_drug_date),
             first_drug = first(.data$first_drug),
             response = ifelse(!is.na(.data$after) & !is.na(.data$before), .data$after - .data$before, NA),
             response_percent = response/ .data$before * 100

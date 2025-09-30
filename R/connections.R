@@ -85,7 +85,13 @@ call_connect <- function(conf) {
         })
     } else if (typestring == "tsv")
     {
-        dat <- fread(path, sep="\t")
+        colclasses <- c()
+        if( "colclasses" %in% names(conf)) {
+            for(i in 1:length(conf$colclasses)) {
+                colclasses[names(conf$colclasses)[i]]  <- as.character(conf$colclasses[[i]])
+            }
+        }
+        dat <- fread(path, sep="\t", colClasses = colclasses)
     } else {
         stop(paste("Unsupported connection type given in configuration file:", typestring,
                    ". Supported types are: parquet, parquet-hive, tsv"))
