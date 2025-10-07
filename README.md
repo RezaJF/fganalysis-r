@@ -51,16 +51,20 @@ To use this package, you can install it from a local source. First, ensure you h
 
 # Set MAKEFLAGS for faster compilation if installing from source
 Sys.setenv(MAKEFLAGS = "-j4")
-## if installing from source, install devtools and
-devtools::install("path/to/fganalysis")
 
-## in sandbox, you can just
+## in sandbox
+
+A duckdb, a later version that is loaded will try to load external packages which is not allowed in sandbox.
+Therefore first manually install older packages that are compatible with the package
+
+install.packages("/usr/finngen-repos/cran/source/src/contrib/duckdb_1.2.1.tar.gz")
+install.packages("/usr/finngen-repos/cran/source/src/contrib/duckdbfs_0.1.0.tar.gz")
+
 library(devtools)
 load_all("/finngen/shared_nfs/finngen/code/fganalysis/")
 conn <- connect_fgdata("/finngen/shared_nfs/finngen/code/fganalysis/config/db_config_sb.json")
 
-# Install the package from its local directory
-devtools::install("path/to/fganalysis-r")
+
 ```
 
 Once installed, load the package into your R session:
@@ -200,26 +204,16 @@ dr <- get_drug_purchases(conn$pheno, c("L01B"))
 before_period <- c(-1, 0)
 after_period <- c(3/12, 1)
 
-<<<<<<< HEAD
-## Create a dataframe containing LDL (omopid 3001308) response to first statin purchase (ATC codes starting with A10) for each finngen ID
-resp <- create_drug_response(conn, c("3001308"),
-                             druglist = c("A10"),
-                             before_period,
-                             after_period,
-                             remove_outliers_sd = 3)  # Optional: remove outliers
-=======
+
 ## create a dataframe containing LDL (omopid 3001308) response to first statin purchase (ATC codes starting with C10AA) for each finngen ID  
-## you can filter min/max values by providing vector of length 2 specifying min and max lab values values accepted
+## you can filter min/max values by providing vector of length 2 specifying min and max lab values values accepted and then removing 3 sd outliers
 min_max <- c(0,20)
 resp <- create_drug_response(conn,c("3001308"), 
                              druglist=c("C10AA"),before_period,after_period,
-                              filter_min_max=min_max)
+                              filter_min_max=min_max,
+                              remove_outliers_sd = 3)
 ## create plots and tables of the respons
 summarize_drug_response(resp, out_file_prefix="3001308_C10AA_resp")
-
-
-
->>>>>>> master
 
 ## Create plots and tables of the response
 summarize_drug_response(resp, out_file_prefix = "3001308_A10_resp")
