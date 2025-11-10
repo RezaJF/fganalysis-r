@@ -2,7 +2,7 @@
 #' @import doParallel
 #' @importFrom parallel detectCores makeCluster stopCluster
 
-#' @title function to compute purchase frequencies for all VNRs in parallel. 
+#' @title Function to compute purchase frequencies for all VNRs in parallel. 
 #' @description Calls compute_purchase_frequency for each VNR, check that function for details of computation
 #' @param data data.frame of purchases for multiple VNRs as returned by get_drug_purchases
 #' @param gap maximum permissible gap between purchases to consider them part of the same treatment interval
