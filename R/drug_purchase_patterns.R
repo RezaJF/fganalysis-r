@@ -59,7 +59,7 @@ compute_purchase_frequency <- function(purchases, gap=30, use_pills_per_pack_onl
     intervals <- list()
     for(i in 2:nrow(purchases) ){ 
         row <- purchases[i,]
-        allowed_gap <- if(!use_pills_per_pack_only) max(row$PackageSize, row$DDDPerPack,na.rm=T) + gap else row$PackageSize + gap
+        allowed_gap <- if(!use_pills_per_pack_only) max(row$PackageSize, row$DDDPerPack,na.rm=TRUE) + gap else row$PackageSize + gap
         if(row$FINNGENID == purchases[i-1,]$FINNGENID & row$APPROX_EVENT_DAY - purchases[i-1,]$APPROX_EVENT_DAY <= allowed_gap){
             intervals[[length(intervals)+1]] <- data.frame(VNR=row$VNR, ATC=row$ATC, medicine=row$Substance, FINNGENID=row$FINNGENID, 
             cadence= as.numeric(row$APPROX_EVENT_DAY - purchases[i-1,]$APPROX_EVENT_DAY))
