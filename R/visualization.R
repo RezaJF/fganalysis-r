@@ -42,8 +42,8 @@ summarize_drug_response <- function(drug_response, out_file_prefix) {
 
     range_baseline_age <- quant_text(responses$n_before)
 
-    n_no_pre <- drug_response$responses %>% filter(is.na(response) & n_before == 0)
-    n_no_pos <- drug_response$responses %>% filter(is.na(response) & n_after == 0)
+    n_no_pre <- drug_response$responses %>% filter(is.na(.data$response) & .data$n_before == 0)
+    n_no_pos <- drug_response$responses %>% filter(is.na(.data$response) & .data$n_after == 0)
 
     plot(ggtexttable(data.frame(
         "Group" = c("labs", "drugs", "in analysis", "no_pre_value", "no_post_value"),

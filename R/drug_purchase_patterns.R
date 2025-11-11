@@ -20,7 +20,7 @@ parallel_compute_purchase_frequencies_for_VNRs <- function(data, gap, use_pills_
         `%myinfix%` <- `%do%`
         intervals <- foreach(vnr=vnrs,.combine = rbind, .packages = c("dplyr","foreach"),
             .export=c("compute_purchase_frequency"), .inorder=FALSE) %myinfix% {
-            vnr_purch <- data %>% filter(VNR==vnr)
+            vnr_purch <- data %>% filter(.data$VNR==vnr)
             print(paste("Processing VNR:", vnr, " with ", nrow(vnr_purch), " purchases"))
             freqs <- compute_purchase_frequency(vnr_purch, gap=gap, use_pills_per_pack_only=use_pills_per_pack_only)
             freqs
@@ -33,7 +33,7 @@ parallel_compute_purchase_frequencies_for_VNRs <- function(data, gap, use_pills_
         tryCatch({
             intervals <- foreach(vnr=vnrs,.combine = rbind, .packages = c("dplyr","foreach"),
                 .export=c("compute_purchase_frequency"), .inorder=FALSE) %myinfix% {
-                vnr_purch <- data %>% filter(VNR==vnr)
+                vnr_purch <- data %>% filter(.data$VNR==vnr)
                 print(paste("Processing VNR:", vnr, " with ", nrow(vnr_purch), " purchases"))
                 freqs <- compute_purchase_frequency(vnr_purch, gap=gap, use_pills_per_pack_only=use_pills_per_pack_only)
                 freqs
@@ -55,7 +55,7 @@ parallel_compute_purchase_frequencies_for_VNRs <- function(data, gap, use_pills_
 #' @return data.frame of purchase intervals
 #' @export
 compute_purchase_frequency <- function(purchases, gap=30, use_pills_per_pack_only=TRUE){
-    purchases <- purchases %>% arrange(FINNGENID, APPROX_EVENT_DAY)
+    purchases <- purchases %>% arrange(.data$FINNGENID, .data$APPROX_EVENT_DAY)
     intervals <- list()
     for(i in 2:nrow(purchases) ){ 
         row <- purchases[i,]
