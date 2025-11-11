@@ -156,13 +156,13 @@ generate_response_summary <- function(lab_measurements, before_period, after_per
             n_after = length(.data$VALUE[.data$lab_period == "After"]),
             before = summary_function(.data$VALUE[.data$lab_period == "Before"], na.rm = TRUE),
             after = summary_function(.data$VALUE[.data$lab_period == "After"], na.rm = TRUE),
-            before = ifelse(n_before>0,summary_function(.data$VALUE[.data$lab_period == "Before"], na.rm = TRUE),NA),
-            after = ifelse(n_after>0,summary_function(.data$VALUE[.data$lab_period == "After"], na.rm = TRUE),NA),
+            before = ifelse(.data$n_before>0,summary_function(.data$VALUE[.data$lab_period == "Before"], na.rm = TRUE),NA),
+            after = ifelse(.data$n_after>0,summary_function(.data$VALUE[.data$lab_period == "After"], na.rm = TRUE),NA),
             baseline_age = first(.data$first_drug_age),
             baseline_date = first(.data$first_drug_date),
             first_drug = first(.data$first_drug),
             response = ifelse(!is.na(.data$after) & !is.na(.data$before), .data$after - .data$before, NA),
-            response_percent = response/ .data$before * 100
+            response_percent = .data$response/ .data$before * 100
 
         )
     lab_response

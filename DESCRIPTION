@@ -12,6 +12,8 @@ Imports:
     ggplot2,
     duckdb,
     duckdbfs,
+    doParallel,
+    foreach,
     bigrquery,
     stringr,
     ggpubr,
