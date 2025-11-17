@@ -99,7 +99,8 @@ cat("\n4. Testing drug response analysis with dulaglutide:\n")
 # Get HbA1c measurements for dulaglutide users
 if (nrow(purchases_with_mapping) > 0) {
   # Take a sample of patients for efficiency
-  sample_patients <- unique(purchases_with_mapping$FINNGENID)[1:min(100, length(unique(purchases_with_mapping$FINNGENID)))]
+  unique_patients <- unique(purchases_with_mapping$FINNGENID)
+  sample_patients <- unique_patients[1:min(100, length(unique_patients))]
 
   cat(sprintf("   Creating drug response for %d sample patients...\n", length(sample_patients)))
 
