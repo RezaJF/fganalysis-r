@@ -7,7 +7,7 @@ library(rjson)
 library(stringr)
 
 # Source the package files directly
-source("/mnt/longGWAS_disk_100GB/long_gwas/Github_clones/fganalysis-r/R/atc_mapping.R")
+source("../R/atc_mapping.R")
 
 cat("========================================\n")
 cat("Simple ATC Mapping Test\n")
