@@ -167,18 +167,18 @@
     "A02BC05": {
       "original": "A02BC05",
       "current": "A02BC05",
-      "historical": ["A02BC01"],
+      "historical": [],
       "related": [],
       "years": ["2000"],
       "description": "esomeprazole"
     },
     "A02BC01": {
       "original": "A02BC01",
-      "current": "A02BC05",
+      "current": "A02BC01",
       "historical": [],
-      "related": ["A02BC05"],
+      "related": [],
       "years": ["2000"],
-      "description": "esomeprazole (old classification - was omeprazole code)"
+      "description": "omeprazole"
     },
     "J07AL02": {
       "original": "J07AL02",
