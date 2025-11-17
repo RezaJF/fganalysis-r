@@ -7,7 +7,20 @@ library(rjson)
 library(stringr)
 
 # Source the package files directly
-script_dir <- dirname(normalizePath(sys.frame(1)$ofile))
+# Robustly determine the script directory
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg[1]))))
+  } else if (!is.null(sys.frame(1)$ofile)) {
+    return(dirname(normalizePath(sys.frame(1)$ofile)))
+  } else {
+    # Fallback: use current working directory
+    return(getwd())
+  }
+}
+script_dir <- get_script_dir()
 source(file.path(script_dir, "..", "R", "atc_mapping.R"))
 
 cat("========================================\n")
