@@ -59,7 +59,7 @@ scrape_and_save_atc_mappings <- function(output_file = "config/atc_mappings.json
             desc <- if (!is.na(desc_col)) as.character(alterations_table[[desc_col]][i]) else ""
 
             # Skip empty entries
-            if (is.na(old_code) || old_code == "" || is.na(new_code) || new_code == "") next
+            if (is.na(old_code) || !nzchar(trimws(old_code)) || is.na(new_code) || !nzchar(trimws(new_code))) next
 
             # Create bidirectional mapping
             # Old -> New
