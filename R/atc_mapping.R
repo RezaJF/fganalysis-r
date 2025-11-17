@@ -36,7 +36,7 @@ load_atc_mappings <- function(custom_file = NULL) {
 
     mapping_file <- NULL
     for (file in possible_files) {
-      if (file.exists(file)) {
+      if (!is.null(file) && file.exists(file)) {
         mapping_file <- file
         break
       }
