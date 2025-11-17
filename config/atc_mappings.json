@@ -119,18 +119,18 @@
     "B01AC24": {
       "original": "B01AC24",
       "current": "B01AC24",
-      "historical": ["B01AC04"],
+      "historical": [],
       "related": [],
       "years": ["2010"],
       "description": "ticagrelor"
     },
     "B01AC04": {
       "original": "B01AC04",
-      "current": "B01AC24",
+      "current": "B01AC04",
       "historical": [],
-      "related": ["B01AC24"],
-      "years": ["2010"],
-      "description": "ticagrelor (old classification - was clopidogrel code)"
+      "related": [],
+      "years": [],
+      "description": "clopidogrel"
     },
     "C09DX04": {
       "original": "C09DX04",
