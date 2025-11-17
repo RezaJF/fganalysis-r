@@ -7,7 +7,8 @@ library(rjson)
 library(stringr)
 
 # Source the package files directly
-source("../R/atc_mapping.R")
+script_dir <- dirname(normalizePath(sys.frame(1)$ofile))
+source(file.path(script_dir, "..", "R", "atc_mapping.R"))
 
 cat("========================================\n")
 cat("Simple ATC Mapping Test\n")
