@@ -200,13 +200,13 @@ test_that("Verbose output provides clear information", {
   clear_atc_cache()
 
   # Capture messages
-  messages <- capture_messages({
+  messages <- capture.output({
     expanded <- expand_atc_codes(
       atc_codes = c("A10BJ05", "A10BX07"),
       include_hierarchical = FALSE,
       verbose = TRUE
     )
-  })
+  }, type = "message")
 
   # Check that messages contain expected information
   expect_true(any(grepl("ATC Code Expansion", messages)))
