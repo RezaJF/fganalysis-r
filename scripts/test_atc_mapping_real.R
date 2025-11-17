@@ -145,7 +145,7 @@ for (i in 1:10) {
 time_with_mapping <- difftime(Sys.time(), start_time, units = "secs")
 
 cat(sprintf("   Average expansion time: %.3f ms per call\n",
-            as.numeric(time_with_mapping) * 100))
+            as.numeric(time_with_mapping) * 1000 / 10))
 cat(sprintf("   Codes expanded from %d to %d\n",
             length(common_atc_codes),
             length(unique(expanded))))
