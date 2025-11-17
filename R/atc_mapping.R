@@ -28,9 +28,10 @@ load_atc_mappings <- function(custom_file = NULL) {
     # Try multiple locations in order of preference
     # Optionally check for environment variable
     env_mapping_file <- Sys.getenv("FGANALYSIS_ATC_MAPPING_FILE", unset = NA)
+    env_file <- if (!is.na(env_mapping_file) && nzchar(env_mapping_file)) env_mapping_file else NULL
     possible_files <- c(
       "config/atc_mappings.json",  # Local development path
-      if (!is.na(env_mapping_file) && nzchar(env_mapping_file)) env_mapping_file else NULL,  # Environment variable
+      env_file,  # Environment variable
       system.file("config", "atc_mappings.json", package = "fganalysis")  # Installed package
     )
 
