@@ -109,7 +109,7 @@ expand_atc_codes <- function(atc_codes, include_hierarchical = TRUE, verbose = T
     message("=== ATC Code Expansion ===")
     message(sprintf("Expanding %d input ATC code(s) using historical mappings", length(atc_codes)))
     message(sprintf("Mappings database contains %d entries (last updated: %s)",
-                   length(mappings), mappings_data$last_updated))
+                   length(mappings), mappings_data$generated_date))
   }
 
   # Process each input code
