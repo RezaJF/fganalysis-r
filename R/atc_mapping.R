@@ -26,23 +26,28 @@ load_atc_mappings <- function(custom_file = NULL) {
     message(sprintf("Loading ATC mappings from custom file: %s", custom_file))
   } else {
     # Try multiple locations in order of preference
+    # First try installed package location (for R CMD check and installed packages)
+    installed_file <- system.file("extdata", "atc_mappings.json", package = "fganalysis")
+    
     # Optionally check for environment variable
     env_mapping_file <- Sys.getenv("FGANALYSIS_ATC_MAPPING_FILE", unset = NA)
     env_file <- if (!is.na(env_mapping_file) && nzchar(env_mapping_file)) env_mapping_file else NULL
+    
     possible_files <- c(
+      installed_file,  # Installed package (highest priority for R CMD check)
       "config/atc_mappings.json",  # Local development path
       env_file,  # Environment variable
-      system.file("config", "atc_mappings.json", package = "fganalysis")  # Installed package
+      system.file("config", "atc_mappings.json", package = "fganalysis")  # Alternative location
     )
-
+    
     mapping_file <- NULL
     for (file in possible_files) {
-      if (!is.null(file) && file.exists(file)) {
+      if (!is.null(file) && file != "" && file.exists(file)) {
         mapping_file <- file
         break
       }
     }
-
+    
     if (is.null(mapping_file)) {
       warning("ATC mappings file not found. Using empty mappings.")
       mappings <- list(
@@ -109,8 +114,9 @@ expand_atc_codes <- function(atc_codes, include_hierarchical = TRUE, verbose = T
   if (verbose) {
     message("=== ATC Code Expansion ===")
     message(sprintf("Expanding %d input ATC code(s) using historical mappings", length(atc_codes)))
+    last_updated <- if (!is.null(mappings_data$generated_date)) mappings_data$generated_date else mappings_data$last_updated
     message(sprintf("Mappings database contains %d entries (last updated: %s)",
-                   length(mappings), mappings_data$generated_date))
+                   length(mappings), last_updated))
   }
 
   # Process each input code
