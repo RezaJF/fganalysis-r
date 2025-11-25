@@ -11,13 +11,26 @@ NULL
 #' @title Load ATC Mappings
 #' @description Loads ATC mappings from packaged JSON file
 #' @param custom_file Optional path to a custom mapping file (for testing or updates)
+#' @param error_if_not_found Logical, if TRUE, error when mapping file is not found (default: FALSE)
 #' @return List of ATC mappings
 #' @export
-load_atc_mappings <- function(custom_file = NULL) {
+load_atc_mappings <- function(custom_file = NULL, error_if_not_found = FALSE) {
 
   # Check if already in memory cache
   if (exists("mappings", envir = .atc_cache)) {
-    return(get("mappings", envir = .atc_cache))
+    cached_mappings <- get("mappings", envir = .atc_cache)
+    # If error is required and mappings are empty, still error
+    if (error_if_not_found && (!is.null(cached_mappings$total_mappings) && cached_mappings$total_mappings == 0)) {
+      stop("ATC mapping file not found. The mapping file is required but was not found in any of the expected locations:\n",
+           "  - ", system.file("extdata", "atc_mappings.json", package = "fganalysis"), "\n",
+           "  - config/atc_mappings.json\n",
+           "  - Environment variable FGANALYSIS_ATC_MAPPING_FILE\n",
+           "\nTo fix this:\n",
+           "  1. Set use_atc_mapping = FALSE to disable ATC mapping, or\n",
+           "  2. Add the atc_mappings.json file to one of the locations above, or\n",
+           "  3. Set the FGANALYSIS_ATC_MAPPING_FILE environment variable to point to the mapping file")
+    }
+    return(cached_mappings)
   }
 
   # Determine which file to load
@@ -28,11 +41,11 @@ load_atc_mappings <- function(custom_file = NULL) {
     # Try multiple locations in order of preference
     # First try installed package location (for R CMD check and installed packages)
     installed_file <- system.file("extdata", "atc_mappings.json", package = "fganalysis")
-    
+
     # Optionally check for environment variable
     env_mapping_file <- Sys.getenv("FGANALYSIS_ATC_MAPPING_FILE", unset = NA)
     env_file <- if (!is.na(env_mapping_file) && nzchar(env_mapping_file)) env_mapping_file else NULL
-    
+
     possible_files <- c(
       installed_file,  # Installed package (highest priority for R CMD check)
       "config/atc_mappings.json",  # Local development path
@@ -49,16 +62,27 @@ load_atc_mappings <- function(custom_file = NULL) {
     }
 
     if (is.null(mapping_file)) {
-      warning("ATC mappings file not found. Using empty mappings.")
-      mappings <- list(
-        mappings = list(),
-        version = "0.0.0",
-        generated_date = Sys.Date(),
-        source_url = "none",
-        total_mappings = 0
-      )
-      assign("mappings", mappings, envir = .atc_cache)
-      return(mappings)
+      if (error_if_not_found) {
+        stop("ATC mapping file not found. The mapping file is required but was not found in any of the expected locations:\n",
+             "  - ", system.file("extdata", "atc_mappings.json", package = "fganalysis"), "\n",
+             "  - config/atc_mappings.json\n",
+             if (!is.null(env_file)) paste0("  - ", env_file, "\n") else "",
+             "\nTo fix this:\n",
+             "  1. Set use_atc_mapping = FALSE to disable ATC mapping, or\n",
+             "  2. Add the atc_mappings.json file to one of the locations above, or\n",
+             "  3. Set the FGANALYSIS_ATC_MAPPING_FILE environment variable to point to the mapping file")
+      } else {
+        warning("ATC mappings file not found. Using empty mappings.")
+        mappings <- list(
+          mappings = list(),
+          version = "0.0.0",
+          generated_date = Sys.Date(),
+          source_url = "none",
+          total_mappings = 0
+        )
+        assign("mappings", mappings, envir = .atc_cache)
+        return(mappings)
+      }
     }
   }
 
@@ -100,23 +124,43 @@ load_atc_mappings <- function(custom_file = NULL) {
 #' @param include_hierarchical If TRUE, also includes hierarchical relationships (e.g., A10A includes A10AA, A10AB)
 #' @param verbose If TRUE, prints detailed expansion information
 #' @param custom_mapping_file Optional path to custom mapping file
+#' @param require_mapping Logical, if TRUE, error when mapping file is not found (default: FALSE)
 #' @return Character vector of expanded ATC codes
 #' @export
-expand_atc_codes <- function(atc_codes, include_hierarchical = TRUE, verbose = TRUE, custom_mapping_file = NULL) {
+expand_atc_codes <- function(atc_codes, include_hierarchical = TRUE, verbose = TRUE, custom_mapping_file = NULL, require_mapping = FALSE) {
 
-  # Load mappings
-  mappings_data <- load_atc_mappings(custom_file = custom_mapping_file)
+  # Load mappings - error if required and not found
+  mappings_data <- load_atc_mappings(custom_file = custom_mapping_file, error_if_not_found = require_mapping)
   mappings <- mappings_data$mappings
+
+  # Check if mappings are empty and mapping was required
+  if (require_mapping && (is.null(mappings_data$total_mappings) || mappings_data$total_mappings == 0)) {
+    stop("ATC mapping file not found. The mapping file is required but was not found in any of the expected locations:\n",
+         "  - ", system.file("extdata", "atc_mappings.json", package = "fganalysis"), "\n",
+         "  - config/atc_mappings.json\n",
+         if (!is.null(Sys.getenv("FGANALYSIS_ATC_MAPPING_FILE", unset = NA))) paste0("  - ", Sys.getenv("FGANALYSIS_ATC_MAPPING_FILE"), "\n") else "",
+         "\nTo fix this:\n",
+         "  1. Set use_atc_mapping = FALSE to disable ATC mapping, or\n",
+         "  2. Add the atc_mappings.json file to one of the locations above, or\n",
+         "  3. Set the FGANALYSIS_ATC_MAPPING_FILE environment variable to point to the mapping file")
+  }
 
   # Initialize expanded set with original codes
   expanded_codes <- character(0)
 
   if (verbose) {
-    message("=== ATC Code Expansion ===")
-    message(sprintf("Expanding %d input ATC code(s) using historical mappings", length(atc_codes)))
-    last_updated <- if (!is.null(mappings_data$generated_date)) mappings_data$generated_date else mappings_data$last_updated
-    message(sprintf("Mappings database contains %d entries (last updated: %s)",
-                   length(mappings), last_updated))
+    # Only show expansion message if mappings are available
+    if (!is.null(mappings_data$total_mappings) && mappings_data$total_mappings > 0) {
+      message("=== ATC Code Expansion ===")
+      message(sprintf("Expanding %d input ATC code(s) using historical mappings", length(atc_codes)))
+      last_updated <- if (!is.null(mappings_data$generated_date)) mappings_data$generated_date else mappings_data$last_updated
+      message(sprintf("Mappings database contains %d entries (last updated: %s)",
+                     length(mappings), last_updated))
+    } else {
+      message("=== ATC Code Expansion ===")
+      message("Warning: No ATC mapping file found. Using original codes only (no expansion).")
+      message("To enable mapping, add atc_mappings.json to config/ or set use_atc_mapping = FALSE")
+    }
   }
 
   # Process each input code

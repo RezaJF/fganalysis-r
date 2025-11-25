@@ -79,7 +79,8 @@ get_drug_purchases <- function(conn, druglist, finngen_ids=NULL, use_only_reimbu
 
     # Expand ATC codes if mapping is enabled
     if (use_atc_mapping) {
-        expanded_druglist <- expand_atc_codes(druglist, include_hierarchical = FALSE, verbose = TRUE)
+        # Require mapping file when use_atc_mapping is explicitly TRUE
+        expanded_druglist <- expand_atc_codes(druglist, include_hierarchical = FALSE, verbose = TRUE, require_mapping = TRUE)
     } else {
         expanded_druglist <- druglist
         message("ATC mapping disabled - using original ATC codes only")

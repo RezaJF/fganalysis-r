@@ -126,7 +126,7 @@ test_that("Integration with get_drug_purchases works with mock data", {
   mappings_loaded <- load_atc_mappings(custom_file = test_mapping_file)
   # Verify mappings were loaded
   expect_true(mappings_loaded$total_mappings > 0)
-  
+
   # Manually expand codes to populate cache with the test fixture
   # This ensures expand_atc_codes will use cached mappings
   expanded_test <- expand_atc_codes(
@@ -269,4 +269,74 @@ test_that("Verbose output provides clear information", {
   expect_true(any(grepl("Expanding.*input ATC code", messages)) || grepl("Expanding.*input ATC code", all_messages))
   expect_true(any(grepl("expanded to", messages)) || grepl("expanded to", all_messages))
   expect_true(any(grepl("Expansion Complete", messages)) || grepl("Expansion Complete", all_messages))
+})
+
+test_that("Error when mapping file not found and use_atc_mapping = TRUE", {
+
+  # Clear cache to ensure fresh state
+  clear_atc_cache()
+
+  # Test that expand_atc_codes errors when require_mapping = TRUE and no file found
+  # Use a non-existent file to simulate missing mappings
+  clear_atc_cache()
+
+  # This should error because require_mapping = TRUE and no valid mapping file
+  expect_error(
+    expand_atc_codes(
+      atc_codes = c("A10BJ05"),
+      include_hierarchical = FALSE,
+      verbose = FALSE,
+      custom_mapping_file = "/nonexistent/path/atc_mappings.json",
+      require_mapping = TRUE
+    ),
+    "ATC mapping file not found"
+  )
+
+  # Test that expand_atc_codes works when require_mapping = FALSE (default)
+  # Even without mappings, it should return original codes
+  clear_atc_cache()
+  result_no_require <- expand_atc_codes(
+    atc_codes = c("A10BJ05"),
+    include_hierarchical = FALSE,
+    verbose = FALSE,
+    custom_mapping_file = "/nonexistent/path/atc_mappings.json",
+    require_mapping = FALSE
+  )
+  expect_true("A10BJ05" %in% result_no_require)  # Should return original code
+
+  # Test that get_drug_purchases works when use_atc_mapping = FALSE
+  # Create minimal mock connection
+  pheno_data <- data.frame(
+    FINNGENID = c("TEST001"),
+    EVENT_AGE = c(50),
+    APPROX_EVENT_DAY = c(18250),
+    CODE1 = c("A10BJ05"),
+    CODE2 = c("205"),
+    CODE3 = c("VNR123"),
+    CODE4 = c("1"),
+    SOURCE = "PURCH",
+    stringsAsFactors = FALSE
+  )
+
+  labs_data <- data.frame(
+    FINNGENID = c("TEST001"),
+    OMOP_CONCEPT_ID = c("3004410"),
+    EVENT_AGE = c(49),
+    VALUE = c(8.5),
+    stringsAsFactors = FALSE
+  )
+
+  mock_conn <- create_mock_connection(
+    pheno_data = pheno_data,
+    labs_data = labs_data
+  )
+
+  # This should work because mapping is disabled
+  result_no_mapping <- get_drug_purchases(
+    conn = mock_conn,
+    druglist = c("A10BJ05"),
+    use_atc_mapping = FALSE,
+    use_only_reimbursement = TRUE
+  )
+  expect_true(nrow(result_no_mapping) >= 0)  # Should succeed without error
 })
