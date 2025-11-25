@@ -39,7 +39,7 @@ load_atc_mappings <- function(custom_file = NULL) {
       env_file,  # Environment variable
       system.file("config", "atc_mappings.json", package = "fganalysis")  # Alternative location
     )
-    
+
     mapping_file <- NULL
     for (file in possible_files) {
       if (!is.null(file) && file != "" && file.exists(file)) {
@@ -47,7 +47,7 @@ load_atc_mappings <- function(custom_file = NULL) {
         break
       }
     }
-    
+
     if (is.null(mapping_file)) {
       warning("ATC mappings file not found. Using empty mappings.")
       mappings <- list(

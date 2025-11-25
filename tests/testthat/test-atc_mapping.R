@@ -63,7 +63,7 @@ test_that("get_atc_relationships returns correct information", {
 
   # Load mappings first
   mappings_data <- load_atc_mappings(custom_file = test_mapping_file)
-  
+
   # Get relationships for current code
   relationships <- get_atc_relationships("A10BJ05", mappings = mappings_data$mappings)
 
@@ -121,11 +121,22 @@ test_that("Integration with get_drug_purchases works with mock data", {
   )
 
   # Load mappings for the test (this populates the cache)
+  # This ensures the cache is populated before get_drug_purchases is called
   clear_atc_cache()
   mappings_loaded <- load_atc_mappings(custom_file = test_mapping_file)
   # Verify mappings were loaded
   expect_true(mappings_loaded$total_mappings > 0)
   
+  # Manually expand codes to populate cache with the test fixture
+  # This ensures expand_atc_codes will use cached mappings
+  expanded_test <- expand_atc_codes(
+    atc_codes = c("A10BJ05"),
+    include_hierarchical = FALSE,
+    verbose = FALSE,
+    custom_mapping_file = test_mapping_file
+  )
+  expect_true("A10BX07" %in% expanded_test)
+
   # Test with ATC mapping enabled (default)
   # expand_atc_codes will use the cached mappings
   drug_purchases_mapped <- get_drug_purchases(
@@ -135,7 +146,7 @@ test_that("Integration with get_drug_purchases works with mock data", {
     use_only_reimbursement = TRUE
   )
 
-  # Should find both TEST001 (A10BJ05) and TEST002 (A10BX07)
+  # Should find TEST001 (A10BJ05), TEST002 (A10BX07), and TEST003 (A10BJ05)
   expect_equal(nrow(drug_purchases_mapped), 3)  # TEST001, TEST002, and TEST003
   expect_true("TEST001" %in% drug_purchases_mapped$FINNGENID)
   expect_true("TEST002" %in% drug_purchases_mapped$FINNGENID)
@@ -207,7 +218,7 @@ test_that("create_drug_response works with ATC mapping", {
   clear_atc_cache()
   mappings_loaded <- load_atc_mappings(custom_file = test_mapping_file)
   expect_true(mappings_loaded$total_mappings > 0)
-  
+
   # Create drug response with ATC mapping
   response <- create_drug_response(
     conn = mock_conn,
